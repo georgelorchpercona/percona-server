@@ -130,6 +130,7 @@ ulonglong   optimize_throttle(THD* thd);
 uint        pk_insert_mode(THD* thd);
 void        set_pk_insert_mode(THD* thd, uint mode);
 my_bool     prelock_empty(THD* thd);
+uint        pushdepth(THD* thd);
 uint        read_block_size(THD* thd);
 uint        read_buf_size(THD* thd);
 row_format_t row_format(THD *thd);

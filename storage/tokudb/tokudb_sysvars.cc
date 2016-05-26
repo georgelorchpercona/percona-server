@@ -787,6 +787,17 @@ static MYSQL_THDVAR_BOOL(
     true);
 
 static MYSQL_THDVAR_UINT(
+    pushdepth,
+    0,
+    "fractal tree ideal message injection depth",
+    NULL,
+    NULL,
+    2,
+    2,
+    128,
+    1);
+
+static MYSQL_THDVAR_UINT(
     read_block_size,
     0,
     "fractal tree read block size",
@@ -982,6 +993,7 @@ st_mysql_sys_var* system_variables[] = {
     MYSQL_SYSVAR(optimize_throttle),
     MYSQL_SYSVAR(pk_insert_mode),
     MYSQL_SYSVAR(prelock_empty),
+    MYSQL_SYSVAR(pushdepth),
     MYSQL_SYSVAR(read_block_size),
     MYSQL_SYSVAR(read_buf_size),
     MYSQL_SYSVAR(row_format),
@@ -1102,6 +1114,9 @@ void set_pk_insert_mode(THD* thd, uint mode) {
 }
 my_bool prelock_empty(THD* thd) {
     return (THDVAR(thd, prelock_empty) != 0);
+}
+uint pushdepth(THD* thd) {
+    return THDVAR(thd, pushdepth);
 }
 uint read_block_size(THD* thd) {
     return THDVAR(thd, read_block_size);

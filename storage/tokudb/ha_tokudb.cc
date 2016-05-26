@@ -1361,6 +1361,7 @@ int ha_tokudb::open_main_dictionary(
     char* newname = NULL;
     size_t newname_len = 0;
     uint open_flags = (is_read_only ? DB_RDONLY : 0) | DB_THREAD;
+    uint32_t pushdepth;
 
     assert_always(share->file == NULL);
     assert_always(share->key_file[primary_key] == NULL);
@@ -1390,6 +1391,19 @@ int ha_tokudb::open_main_dictionary(
             open_flags,
             0);
     if (error) {
+        goto exit;
+    }
+
+    pushdepth = tokudb::sysvars::pushdepth(ha_thd());
+    error = share->file->set_pushdepth(share->file, pushdepth);
+    assert_always(error == 0);
+    if (error != 0) {
+        DBUG_PRINT(
+            "error",
+            ("Got error: %d when setting push depth %u for table '%s'",
+                error,
+                pushdepth,
+                name));
         goto exit;
     }
 
@@ -1432,6 +1446,7 @@ int ha_tokudb::open_secondary_dictionary(
     uint open_flags = (is_read_only ? DB_RDONLY : 0) | DB_THREAD;
     char* newname = NULL;
     size_t newname_len = 0;
+    uint32_t pushdepth;
 
     sprintf(dict_name, "key-%s", key_info->name);
 
@@ -1456,6 +1471,20 @@ int ha_tokudb::open_secondary_dictionary(
         my_errno = error;
         goto cleanup;
     }
+    pushdepth = tokudb::sysvars::pushdepth(ha_thd());
+    error = (*ptr)->set_pushdepth(*ptr, pushdepth);
+    assert_always(error == 0);
+    if (error != 0) {
+        DBUG_PRINT(
+            "error",
+            ("Got error: %d when setting push depth %u for table '%s'",
+                error,
+                pushdepth,
+                name));
+        my_errno = error;
+        goto cleanup;
+    }
+
     TOKUDB_HANDLER_TRACE_FOR_FLAGS(
         TOKUDB_DEBUG_OPEN,
         "open:%s:file=%p",
