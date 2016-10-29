@@ -54,6 +54,8 @@ inline tokudb::sysvars::row_format_t toku_compression_method_to_row_format(
         return tokudb::sysvars::SRV_ROW_FORMAT_QUICKLZ;
     case TOKU_LZMA_METHOD:
         return tokudb::sysvars::SRV_ROW_FORMAT_LZMA;
+    case TOKU_LZ4_METHOD:
+        return tokudb::sysvars::SRV_ROW_FORMAT_LZ4;
     case TOKU_DEFAULT_COMPRESSION_METHOD:
         return tokudb::sysvars::SRV_ROW_FORMAT_DEFAULT;
     case TOKU_FAST_COMPRESSION_METHOD:
@@ -82,6 +84,8 @@ inline toku_compression_method row_format_to_toku_compression_method(
     case tokudb::sysvars::SRV_ROW_FORMAT_LZMA:
     case tokudb::sysvars::SRV_ROW_FORMAT_SMALL:
         return TOKU_LZMA_METHOD;
+    case tokudb::sysvars::SRV_ROW_FORMAT_LZ4:
+        return TOKU_LZ4_METHOD;
     default:
         assert_unreachable();
     }
@@ -101,6 +105,8 @@ inline enum row_type row_format_to_row_type(
         return ROW_TYPE_TOKU_QUICKLZ;
     case tokudb::sysvars::SRV_ROW_FORMAT_LZMA:
         return ROW_TYPE_TOKU_LZMA;
+    case tokudb::sysvars::SRV_ROW_FORMAT_LZ4:
+        return ROW_TYPE_TOKU_LZ4;
     case tokudb::sysvars::SRV_ROW_FORMAT_SMALL:
         return ROW_TYPE_TOKU_SMALL;
     case tokudb::sysvars::SRV_ROW_FORMAT_FAST:
@@ -126,6 +132,8 @@ inline tokudb::sysvars::row_format_t row_type_to_row_format(
         return tokudb::sysvars::SRV_ROW_FORMAT_QUICKLZ;
     case ROW_TYPE_TOKU_LZMA:
         return tokudb::sysvars::SRV_ROW_FORMAT_LZMA;
+    case ROW_TYPE_TOKU_LZ4:
+        return tokudb::sysvars::SRV_ROW_FORMAT_LZ4;
     case ROW_TYPE_TOKU_SMALL:
         return tokudb::sysvars::SRV_ROW_FORMAT_SMALL;
     case ROW_TYPE_TOKU_FAST:

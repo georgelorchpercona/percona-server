@@ -823,6 +823,7 @@ static const char *tokudb_row_format_names[] = {
     "tokudb_fast",
     "tokudb_small",
     "tokudb_default",
+    "tokudb_lz4",
     NullS
 };
 
@@ -838,7 +839,8 @@ static MYSQL_THDVAR_ENUM(
     PLUGIN_VAR_OPCMDARG,
     "Specifies the compression method for a table created during this session. "
     "Possible values are TOKUDB_UNCOMPRESSED, TOKUDB_ZLIB, TOKUDB_SNAPPY, "
-    "TOKUDB_QUICKLZ, TOKUDB_LZMA, TOKUDB_FAST, TOKUDB_SMALL and TOKUDB_DEFAULT",
+    "TOKUDB_QUICKLZ, TOKUDB_LZMA, TOKUDB_LZ4, TOKUDB_FAST, TOKUDB_SMALL and "
+    "TOKUDB_DEFAULT",
     NULL,
     NULL,
     SRV_ROW_FORMAT_ZLIB,

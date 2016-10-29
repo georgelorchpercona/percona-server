@@ -1622,6 +1622,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, ulong *yystacksize);
 %token  TOKU_SNAPPY_SYM
 %token  TOKU_QUICKLZ_SYM
 %token  TOKU_LZMA_SYM
+%token  TOKU_LZ4_SYM
 %token  TOKU_FAST_SYM
 %token  TOKU_SMALL_SYM
 %token  TRAILING                      /* SQL-2003-R */
@@ -6289,6 +6290,7 @@ row_types:
         | TOKU_SNAPPY_SYM       { $$= ROW_TYPE_TOKU_SNAPPY; }
         | TOKU_QUICKLZ_SYM      { $$= ROW_TYPE_TOKU_QUICKLZ; }
         | TOKU_LZMA_SYM         { $$= ROW_TYPE_TOKU_LZMA; }
+        | TOKU_LZ4_SYM          { $$= ROW_TYPE_TOKU_LZ4; }
         | TOKU_FAST_SYM         { $$= ROW_TYPE_TOKU_FAST; }
         | TOKU_SMALL_SYM        { $$= ROW_TYPE_TOKU_SMALL; }
         ;
@@ -14625,6 +14627,7 @@ keyword_sp:
         | TOKU_SNAPPY_SYM          {}
         | TOKU_QUICKLZ_SYM         {}
         | TOKU_LZMA_SYM            {}
+        | TOKU_LZ4_SYM             {}
         | TOKU_SMALL_SYM           {}
         | TOKU_FAST_SYM            {}
         | TYPES_SYM                {}
