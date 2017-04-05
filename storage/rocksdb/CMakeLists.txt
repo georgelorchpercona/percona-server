@@ -7,6 +7,32 @@ ELSE ()
   MESSAGE(STATUS "Building with MyRocks storage engine")
 ENDIF ()
 
+# check platform support, no 32 bit
+IF (NOT CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+  MESSAGE(STATUS "x86_64 is only platform supported. ${CMAKE_SYSTEM_PROCESSOR} found. Not building MyRocks")
+  RETURN()
+ENDIF ()
+
+# check compiler version, 4.8.0 is minimal accepted
+IF ((CMAKE_CXX_COMPILER_ID STREQUAL GNU) AND
+    (CMAKE_CXX_COMPILER_VERSION VERSION_LESS "4.8.0"))
+  MESSAGE(STATUS "GCC >= 4.8.0 required. ${CMAKE_CXX_COMPILER_VERSION} found. Not building MyRocks")
+  RETURN()
+ENDIF()
+
+## adds a compiler flag if the compiler supports it
+INCLUDE(CheckCCompilerFlag)
+INCLUDE(CheckCXXCompilerFlag)
+
+# pick language dialect, must have cxx11
+check_cxx_compiler_flag(-std=c++11 HAVE_STDCXX11)
+IF (HAVE_STDCXX11)
+  SET(CMAKE_CXX_FLAGS "-std=c++11 -Wno-deprecated-declarations ${CMAKE_CXX_FLAGS}")
+ELSE ()
+  MESSAGE(STATUS "${CMAKE_CXX_COMPILER} doesn't support -std=c++11, you need one that does. Not building MyRocks")
+  RETURN()
+ENDIF()
+
 IF (NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/rocksdb/Makefile")
   MESSAGE(SEND_ERROR "Missing Makefile in rocksdb directory. Try \"git submodule update\".")
 ENDIF()
@@ -14,18 +40,6 @@ ENDIF()
 CHECK_FUNCTION_EXISTS(sched_getcpu  HAVE_SCHED_GETCPU)
 IF(HAVE_SCHED_GETCPU)
   ADD_DEFINITIONS(-DHAVE_SCHED_GETCPU=1)
-ENDIF()
-
-## adds a compiler flag if the compiler supports it
-INCLUDE(CheckCCompilerFlag)
-INCLUDE(CheckCXXCompilerFlag)
-
-# pick language dialect
-check_cxx_compiler_flag(-std=c++11 HAVE_STDCXX11)
-IF (HAVE_STDCXX11)
-  SET(CMAKE_CXX_FLAGS "-std=c++11 -Wno-deprecated-declarations ${CMAKE_CXX_FLAGS}")
-ELSE ()
-  MESSAGE(FATAL_ERROR "${CMAKE_CXX_COMPILER} doesn't support -std=c++11, you need one that does.")
 ENDIF()
 
 # get a list of rocksdb library source files
