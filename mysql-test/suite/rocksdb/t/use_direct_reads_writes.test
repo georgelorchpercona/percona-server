@@ -6,13 +6,16 @@
 # server will not start with that configuration
 
 --let SEARCH_FILE=$MYSQLTEST_VARDIR/tmp/rocksdb.use_direct_reads_writes.err
+--let $DATADIR=`SELECT @@DATADIR`
+--let $BASEDIR=`SELECT @@BASEDIR` 
 
 --source include/shutdown_mysqld.inc
 
 # Expect server crash on startup with invalid combination of arguments
 # Attempt to restart the server with invalid options
 --error 1
---exec $MYSQLD --log-error=$SEARCH_FILE --rocksdb_use_direct_reads=1 --rocksdb_allow_mmap_reads=1
+--exec $MYSQLD --no-defults --lc_messages_dir=$MYSQL_SHAREDIR --basedir=$BASEDIR --datadir=$DATADIR --log-error=$SEARCH_FILE --rocksdb_use_direct_reads=1 --rocksdb_allow_mmap_reads=1
+--exec cat $SEARCH_FILE
 
 # We should now have an error message
 --let SEARCH_PATTERN=enable both use_direct_reads
@@ -22,7 +25,7 @@
 # Repeat with --rocksdb-use-direct-writes
 # Attempt to restart the server with invalid options
 --error 1
---exec $MYSQLD --log-error=$SEARCH_FILE --rocksdb_use_direct_io_for_flush_and_compaction=1 --rocksdb_allow_mmap_writes=1
+--exec $MYSQLD --no-defults --lc_messages_dir=$MYSQL_SHAREDIR --basedir=$BASEDIR --datadir=$DATADIR --log-error=$SEARCH_FILE --rocksdb_use_direct_io_for_flush_and_compaction=1 --rocksdb_allow_mmap_writes=1
 
 # We should now have an error message
 --let SEARCH_PATTERN=enable both use_direct_io_for_flush_and_compaction
