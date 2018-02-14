@@ -15,5 +15,8 @@ while(readline($f)) {
 }
 
 if ($a > $b * 2) {
-  printf("Compacted\n");
+  print "Compacted\n";
+}
+else {
+  print "before $a after $b, before is <= after, Not Compacted\n";
 }
