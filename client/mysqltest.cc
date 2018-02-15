@@ -5223,7 +5223,7 @@ static void abort_process(int pid, const char *path)
 
 void do_shutdown_server(struct st_command *command)
 {
-  long timeout=90;
+  long orig_timeout,timeout=360;
   int pid, error= 0;
   std::string ds_file_name;
   MYSQL* mysql = &cur_con->mysql;
@@ -5272,6 +5272,7 @@ void do_shutdown_server(struct st_command *command)
   }
   DBUG_PRINT("info", ("Got pid %d", pid));
 
+  orig_timeout = timeout;
   if (timeout)
   {
     /* Check if we should generate a minidump on timeout. */
@@ -5309,6 +5310,7 @@ void do_shutdown_server(struct st_command *command)
       }
     } while(timeout-- > 0);
     error= 2;
+    die("Timeout waiting for server to shutdown, %ld", orig_timeout);
     /*
       Abort to make it easier to find the hang/problem.
     */
