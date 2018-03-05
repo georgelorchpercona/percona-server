@@ -102,6 +102,8 @@ IF(DEFINED TOKUDB_NOPATCH_CONFIG)
 ENDIF()
 
 prepend_cflags_if_supported(-Wno-missing-field-initializers)
+prepend_cflags_if_supported(-Wno-shadow)
+prepend_cflags_if_supported(-Wno-undef)
 append_cflags_if_supported(-Wno-vla)
 
 IF (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/PerconaFT/")
