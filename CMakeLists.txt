@@ -301,6 +301,7 @@ INCLUDE(component)
 INCLUDE(install_macros)
 INCLUDE(install_layout)
 INCLUDE(mysql_add_executable)
+INCLUDE(prepend_append_cflags_if_supported)
 INCLUDE(mysqlgcs)
 INCLUDE(curl)
 
