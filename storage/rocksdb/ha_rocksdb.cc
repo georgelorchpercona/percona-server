@@ -421,6 +421,11 @@ static void rocksdb_set_max_background_jobs(THD *thd,
                                             struct st_mysql_sys_var *const var,
                                             void *const var_ptr,
                                             const void *const save);
+
+static void rocksdb_set_writable_file_max_buffer_size(
+    THD *thd, struct st_mysql_sys_var *const var, void *const var_ptr,
+    const void *const save);
+
 static void rocksdb_set_bytes_per_sync(THD *thd,
                                        struct st_mysql_sys_var *const var,
                                        void *const var_ptr,
@@ -933,6 +938,14 @@ static MYSQL_SYSVAR_INT(max_background_jobs,
                         rocksdb_set_max_background_jobs,
                         rocksdb_db_options->max_background_jobs,
                         /* min */ -1, /* max */ MAX_BACKGROUND_JOBS, 0);
+
+static MYSQL_SYSVAR_ULONG(
+    writable_file_max_buffer_size,
+    rocksdb_db_options->writable_file_max_buffer_size, PLUGIN_VAR_RQCMDARG,
+    "DBOptions::writable_file_max_buffer_size for RocksDB", nullptr,
+    rocksdb_set_writable_file_max_buffer_size,
+    rocksdb_db_options->writable_file_max_buffer_size,
+    /* min */ 1024, /* max */ LONG_MAX, 0);
 
 static MYSQL_SYSVAR_UINT(max_subcompactions,
                          rocksdb_db_options->max_subcompactions,
@@ -1519,6 +1532,7 @@ static struct st_mysql_sys_var *rocksdb_system_variables[] = {
     MYSQL_SYSVAR(persistent_cache_size_mb),
     MYSQL_SYSVAR(delete_obsolete_files_period_micros),
     MYSQL_SYSVAR(max_background_jobs),
+    MYSQL_SYSVAR(writable_file_max_buffer_size),
     MYSQL_SYSVAR(max_log_file_size),
     MYSQL_SYSVAR(max_subcompactions),
     MYSQL_SYSVAR(log_file_time_to_roll),
@@ -12254,6 +12268,34 @@ static void rocksdb_set_max_background_jobs(THD *thd,
   RDB_MUTEX_UNLOCK_CHECK(rdb_sysvars_mutex);
 }
 
+static void rocksdb_set_writable_file_max_buffer_size(
+    THD *thd, struct st_mysql_sys_var *const var, void *const var_ptr,
+    const void *const save) {
+  DBUG_ASSERT(save != nullptr);
+  DBUG_ASSERT(rocksdb_db_options != nullptr);
+  DBUG_ASSERT(rocksdb_db_options->env != nullptr);
+
+  RDB_MUTEX_LOCK_CHECK(rdb_sysvars_mutex);
+
+  const ulonglong new_val = *static_cast<const ulonglong *>(save);
+
+  if (rocksdb_db_options->writable_file_max_buffer_size != new_val) {
+    rocksdb_db_options->writable_file_max_buffer_size = new_val;
+    rocksdb::Status s = rdb->SetDBOptions(
+        {{"writable_file_max_buffer_size", std::to_string(new_val)}});
+
+    if (!s.ok()) {
+      /* NO_LINT_DEBUG */
+      sql_print_warning(
+          "MyRocks: failed to update writable_file_max_buffer_size. "
+          "Status code = %d, status = %s.",
+          s.code(), s.ToString().c_str());
+    }
+  }
+
+  RDB_MUTEX_UNLOCK_CHECK(rdb_sysvars_mutex);
+}
+
 static void rocksdb_set_bytes_per_sync(
     THD *thd MY_ATTRIBUTE((__unused__)),
     struct st_mysql_sys_var *const var MY_ATTRIBUTE((__unused__)),
@@ -12273,7 +12315,7 @@ static void rocksdb_set_bytes_per_sync(
 
     if (!s.ok()) {
       /* NO_LINT_DEBUG */
-      sql_print_warning("MyRocks: failed to update max_background_jobs. "
+      sql_print_warning("MyRocks: failed to update bytes_per_sec. "
                         "Status code = %d, status = %s.",
                         s.code(), s.ToString().c_str());
     }
@@ -12301,7 +12343,7 @@ static void rocksdb_set_wal_bytes_per_sync(
 
     if (!s.ok()) {
       /* NO_LINT_DEBUG */
-      sql_print_warning("MyRocks: failed to update max_background_jobs. "
+      sql_print_warning("MyRocks: failed to update wal_bytes_per_sync. "
                         "Status code = %d, status = %s.",
                         s.code(), s.ToString().c_str());
     }
