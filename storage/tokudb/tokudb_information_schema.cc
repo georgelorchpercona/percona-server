@@ -26,7 +26,7 @@ Copyright (c) 2006, 2015, Percona and/or its affiliates. All rights reserved.
 
 #include "hatoku_hton.h"
 #include "tokudb_information_schema.h"
-#include "sql_time.h"
+#include "sql/sql_time.h"
 #include "tokudb_background.h"
 
 

@@ -27,7 +27,7 @@ Copyright (c) 2006, 2015, Percona and/or its affiliates. All rights reserved.
 #include "hatoku_hton.h"
 #include "tokudb_dir_cmd.h"
 #include "my_dbug.h"
-#include "sql_base.h"
+#include "sql/sql_base.h"
 
 #include <vector>
 #include <string>

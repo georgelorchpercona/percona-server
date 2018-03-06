@@ -25,10 +25,10 @@ Copyright (c) 2006, 2015, Percona and/or its affiliates. All rights reserved.
 #ident "Copyright (c) 2006, 2015, Percona and/or its affiliates. All rights reserved."
 
 #include "hatoku_hton.h"
-#include "sql_acl.h"
 #include "tokudb_dir_cmd.h"
-#include "sql_parse.h"
-#include "sql_plugin.h"
+#include "sql/sql_parse.h"
+#include "sql/sql_plugin.h"
+#include "sql/auth/auth_acls.h" // for SUPER_ACL below
 
 namespace tokudb {
 namespace sysvars {
