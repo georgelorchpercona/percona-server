@@ -91,7 +91,7 @@ inline toku_compression_method row_format_to_toku_compression_method(
 }
 
 inline enum row_type row_format_to_row_type(
-    tokudb::sysvars::row_format_t row_format) {
+    TOKUDB_UNUSED(tokudb::sysvars::row_format_t row_format)) {
 #if defined(TOKU_INCLUDE_ROW_TYPE_COMPRESSION) && \
     TOKU_INCLUDE_ROW_TYPE_COMPRESSION
     switch (row_format) {
@@ -118,7 +118,7 @@ inline enum row_type row_format_to_row_type(
 }
 
 inline tokudb::sysvars::row_format_t row_type_to_row_format(
-    enum row_type type) {
+    TOKUDB_UNUSED(enum row_type type)) {
 #if defined(TOKU_INCLUDE_ROW_TYPE_COMPRESSION) && \
     TOKU_INCLUDE_ROW_TYPE_COMPRESSION
     switch (type) {
