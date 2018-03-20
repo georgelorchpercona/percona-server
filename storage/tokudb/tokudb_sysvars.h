@@ -134,8 +134,6 @@ ulonglong   rpl_lookup_rows_delay(THD* thd);
 bool        rpl_unique_checks(THD* thd);
 ulonglong   rpl_unique_checks_delay(THD* thd);
 #endif  // defined(TOKU_INCLUDE_RFR) && TOKU_INCLUDE_RFR
-bool        support_xa(THD* thd);
-void        set_support_xa(THD* thd, bool xa);
 
 extern st_mysql_sys_var* system_variables[];
 
