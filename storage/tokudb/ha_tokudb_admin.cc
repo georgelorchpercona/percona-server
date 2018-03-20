@@ -176,10 +176,11 @@ void recount_rows_t::on_run() {
         _txn = NULL;
     }
 
-    sql_print_information(
-        "tokudb analyze recount rows %d counted %lld",
-        _result,
-        _share->row_count());
+    LogPluginErrMsg(INFORMATION_LEVEL,
+                    0,
+                    "Analyze recount rows %d counted %lld",
+                    _result,
+                    _share->row_count());
 error:
     if(_thd)
         tokudb_thd_set_proc_info(_thd, orig_proc_info);
@@ -460,12 +461,13 @@ void standard_t::on_run() {
                                         system_charset_info);
             _thd->get_protocol()->end_row();
 
-            sql_print_information(
-                "tokudb analyze on %.*s %.*s",
-                namelen,
-                name,
-                rowmsglen,
-                rowmsg);
+            LogPluginErrMsg(INFORMATION_LEVEL,
+                            0,
+                            "Analyze on %.*s %.*s",
+                            namelen,
+                            name,
+                            rowmsglen,
+                            rowmsg);
         }
 
         total_key_parts += _share->_key_descriptors[_current_key]._parts;

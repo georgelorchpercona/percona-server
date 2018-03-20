@@ -26,6 +26,8 @@ Copyright (c) 2006, 2015, Percona and/or its affiliates. All rights reserved.
 #ifndef _HATOKU_DEFINES_H
 #define _HATOKU_DEFINES_H
 
+#define LOG_COMPONENT_TAG "tokudb"
+
 #include "my_config.h"
 #define MYSQL_SERVER 1
 #include "mysql_version.h"
@@ -41,6 +43,8 @@ Copyright (c) 2006, 2015, Percona and/or its affiliates. All rights reserved.
 #include "sql/table.h"
 
 #include "my_thread.h"
+#include "mysql/components/my_service.h"
+#include "mysql/components/services/log_builtins.h"
 #include "mysql/psi/mysql_cond.h"
 #include "mysql/psi/mysql_memory.h"
 #include "mysql/psi/mysql_mutex.h"

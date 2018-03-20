@@ -35,14 +35,17 @@ static bool tables_have_same_keys(TABLE* table,
     bool retval;
     if (table->s->keys != altered_table->s->keys) {
         if (print_error) {
-            sql_print_error("tables have different number of keys");
+            LogPluginErrMsg(
+                ERROR_LEVEL, 0, "Tables have different number of keys");
         }
         retval = false;
         goto cleanup;
     }
     if (table->s->primary_key != altered_table->s->primary_key) {
         if (print_error) {
-            sql_print_error("Tables have different primary keys, %d %d",
+            LogPluginErrMsg(ERROR_LEVEL,
+                            0,
+                            "Tables have different primary keys, %d %d",
                             table->s->primary_key,
                             altered_table->s->primary_key);
         }
@@ -54,7 +57,9 @@ static bool tables_have_same_keys(TABLE* table,
         KEY* curr_altered_key = &altered_table->key_info[i];
         if (strcmp(curr_orig_key->name, curr_altered_key->name)) {
             if (print_error) {
-                sql_print_error("key %d has different name, %s %s",
+                LogPluginErrMsg(ERROR_LEVEL,
+                                0,
+                                "Key %d has different name, %s %s",
                                 i,
                                 curr_orig_key->name,
                                 curr_altered_key->name);
@@ -65,8 +70,10 @@ static bool tables_have_same_keys(TABLE* table,
         if (key_is_clustering(curr_orig_key) !=
             key_is_clustering(curr_altered_key)) {
             if (print_error) {
-                sql_print_error(
-                    "keys disagree on if they are clustering, %d, %d",
+                LogPluginErrMsg(
+                    ERROR_LEVEL,
+                    0,
+                    "Keys disagree on if they are clustering, %d, %d",
                     curr_orig_key->user_defined_key_parts,
                     curr_altered_key->user_defined_key_parts);
             }
@@ -76,7 +83,9 @@ static bool tables_have_same_keys(TABLE* table,
         if (((curr_orig_key->flags & HA_NOSAME) == 0) !=
             ((curr_altered_key->flags & HA_NOSAME) == 0)) {
             if (print_error) {
-                sql_print_error("keys disagree on if they are unique, %d, %d",
+                LogPluginErrMsg(ERROR_LEVEL,
+                                0,
+                                "Keys disagree on if they are unique, %d, %d",
                                 curr_orig_key->user_defined_key_parts,
                                 curr_altered_key->user_defined_key_parts);
             }
@@ -86,7 +95,9 @@ static bool tables_have_same_keys(TABLE* table,
         if (curr_orig_key->user_defined_key_parts !=
             curr_altered_key->user_defined_key_parts) {
             if (print_error) {
-                sql_print_error("keys have different number of parts, %d, %d",
+                LogPluginErrMsg(ERROR_LEVEL,
+                                0,
+                                "Keys have different number of parts, %d, %d",
                                 curr_orig_key->user_defined_key_parts,
                                 curr_altered_key->user_defined_key_parts);
             }
@@ -103,7 +114,9 @@ static bool tables_have_same_keys(TABLE* table,
             Field* curr_altered_field = curr_altered_part->field;
             if (curr_orig_part->length != curr_altered_part->length) {
                 if (print_error) {
-                    sql_print_error("Key %s has different length at index %d",
+                    LogPluginErrMsg(ERROR_LEVEL,
+                                    0,
+                                    "Key %s has different length at index %d",
                                     curr_orig_key->name,
                                     j);
                 }
@@ -121,7 +134,9 @@ static bool tables_have_same_keys(TABLE* table,
 
             if (!are_fields_same) {
                 if (print_error) {
-                    sql_print_error("Key %s has different field at index %d",
+                    LogPluginErrMsg(ERROR_LEVEL,
+                                    0,
+                                    "Key %s has different field at index %d",
                                     curr_orig_key->name,
                                     j);
                 }
@@ -561,7 +576,8 @@ static int find_changed_columns(uint32_t* changed_columns,
     assert_always(bigger_table->s->fields > smaller_table->s->fields);
     for (uint i = 0; i < smaller_table->s->fields; i++, curr_new_col_index++) {
         if (curr_new_col_index >= bigger_table->s->fields) {
-            sql_print_error("error in determining changed columns");
+            LogPluginErrMsg(
+                ERROR_LEVEL, 0, "Error in determining changed columns");
             retval = 1;
             goto cleanup;
         }
@@ -573,7 +589,8 @@ static int find_changed_columns(uint32_t* changed_columns,
             curr_new_col_index++;
             curr_field_in_new = bigger_table->field[curr_new_col_index];
             if (curr_new_col_index >= bigger_table->s->fields) {
-                sql_print_error("error in determining changed columns");
+                LogPluginErrMsg(
+                    ERROR_LEVEL, 0, "Error in determining changed columns");
                 retval = 1;
                 goto cleanup;
             }
@@ -582,7 +599,9 @@ static int find_changed_columns(uint32_t* changed_columns,
         // the same, let's verify make sure the two fields that have the same
         // name are ok
         if (!are_two_fields_same(curr_field_in_orig, curr_field_in_new)) {
-            sql_print_error(
+            LogPluginErrMsg(
+                ERROR_LEVEL,
+                0,
                 "Two fields that were supposedly the same are not: %s in "
                 "original, %s in new",
                 curr_field_in_orig->field_name,
@@ -608,8 +627,10 @@ static bool tables_have_same_keys_and_columns(TABLE* first_table,
     if (first_table->s->null_bytes != second_table->s->null_bytes) {
         retval = false;
         if (print_error) {
-            sql_print_error(
-                "tables have different number of null bytes, %d, %d",
+            LogPluginErrMsg(
+                ERROR_LEVEL,
+                0,
+                "Tables have different number of null bytes, %d, %d",
                 first_table->s->null_bytes,
                 second_table->s->null_bytes);
         }
@@ -618,7 +639,9 @@ static bool tables_have_same_keys_and_columns(TABLE* first_table,
     if (first_table->s->fields != second_table->s->fields) {
         retval = false;
         if (print_error) {
-            sql_print_error("tables have different number of fields, %d, %d",
+            LogPluginErrMsg(ERROR_LEVEL,
+                            0,
+                            "Tables have different number of fields, %d, %d",
                             first_table->s->fields,
                             second_table->s->fields);
         }
@@ -629,7 +652,10 @@ static bool tables_have_same_keys_and_columns(TABLE* first_table,
         Field* b = second_table->field[i];
         if (!are_two_fields_same(a, b)) {
             retval = false;
-            sql_print_error("tables have different fields at position %d", i);
+            LogPluginErrMsg(ERROR_LEVEL,
+                            0,
+                            "Tables have different fields at position %d",
+                            i);
             goto exit;
         }
     }
