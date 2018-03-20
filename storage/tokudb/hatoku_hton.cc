@@ -179,7 +179,7 @@ void toku_hton_assert_fail(
     abort();
 }
 
-//my_bool tokudb_shared_data = false;
+//bool tokudb_shared_data = false;
 static uint32_t tokudb_init_flags = 
     DB_CREATE | DB_THREAD | DB_PRIVATE | 
     DB_INIT_LOCK | 
@@ -405,7 +405,7 @@ static int tokudb_init_func(void *p) {
         TOKUDB_TRACE("Using tokudb_support_xa is deprecated and the "
             "parameter may be removed in future releases. "
             "See documentation and release notes for details");
-           tokudb::sysvars::set_support_xa(NULL, TRUE);
+           tokudb::sysvars::set_support_xa(NULL, true);
     }
 
     //
