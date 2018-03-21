@@ -7231,12 +7231,10 @@ cleanup:
 //      0 on success
 //      error otherwise
 //
-int ha_tokudb::create(
-    const char* name,
-    TABLE* form,
-    HA_CREATE_INFO* create_info,
-    TOKUDB_UNUSED(dd::Table *table_def)) {
-
+int ha_tokudb::create(const char* name,
+                      TABLE* form,
+                      HA_CREATE_INFO* create_info,
+                      TOKUDB_UNUSED(dd::Table* table_def)) {
     TOKUDB_HANDLER_DBUG_ENTER("%s", name);
 
     int error;
