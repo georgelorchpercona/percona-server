@@ -722,8 +722,6 @@ public:
     ~ha_tokudb();
 
     const char *table_type() const;
-    const char *index_type(uint inx);
-    const char **bas_ext() const;
 
     //
     // Returns a bit mask of capabilities of storage engine. Capabilities 
@@ -772,12 +770,21 @@ public:
     // Defined in mysql 5.6
     double index_only_read_time(uint keynr, double records);
 
-    int open(const char *name, int mode, uint test_if_locked);
+    int open(const char* name,
+             int mode,
+             uint test_if_locked,
+             const dd::Table* table_def);
     int close();
     void update_create_info(HA_CREATE_INFO* create_info);
-    int create(const char *name, TABLE * form, HA_CREATE_INFO * create_info);
-    int delete_table(const char *name);
-    int rename_table(const char *from, const char *to);
+    int create(const char* name,
+               TABLE* form,
+               HA_CREATE_INFO* create_info,
+               dd::Table* table_def);
+    int delete_table(const char* name, const dd::Table* table_def);
+    int rename_table(const char* from,
+                     const char* to,
+                     const dd::Table* from_table_def,
+                     dd::Table* to_table_def);
     int optimize(THD * thd, HA_CHECK_OPT * check_opt);
     int analyze(THD * thd, HA_CHECK_OPT * check_opt);
     int write_row(uchar * buf);
@@ -879,10 +886,23 @@ public:
     void cancel_pushed_idx_cond();
 
  public:
-    enum_alter_inplace_result check_if_supported_inplace_alter(TABLE *altered_table, Alter_inplace_info *ha_alter_info);
-    bool prepare_inplace_alter_table(TABLE *altered_table, Alter_inplace_info *ha_alter_info);
-    bool inplace_alter_table(TABLE *altered_table, Alter_inplace_info *ha_alter_info);
-    bool commit_inplace_alter_table(TABLE *altered_table, Alter_inplace_info *ha_alter_info, bool commit);
+  enum_alter_inplace_result check_if_supported_inplace_alter(
+      TABLE* altered_table,
+      Alter_inplace_info* ha_alter_info);
+  bool prepare_inplace_alter_table(TABLE* altered_table,
+                                   Alter_inplace_info* ha_alter_info,
+                                   const dd::Table* old_table_def,
+                                   dd::Table* new_table_def);
+  bool inplace_alter_table(TABLE* altered_table,
+                           Alter_inplace_info* ha_alter_info,
+                           const dd::Table* old_table_ref,
+                           dd::Table* new_table_ref);
+  bool commit_inplace_alter_table(TABLE* altered_table,
+                                  Alter_inplace_info* ha_alter_info,
+                                  bool commit,
+                                  const dd::Table* old_table_def,
+                                  dd::Table* new_table_def);
+
  private:
     int alter_table_add_index(Alter_inplace_info* ha_alter_info);
     int alter_table_drop_index(Alter_inplace_info* ha_alter_info);
@@ -918,8 +938,8 @@ public:
  public:
     // delete all rows from the table
     // effect: all dictionaries, including the main and indexes, should be empty
-    int discard_or_import_tablespace(bool discard);
-    int truncate();
+    int discard_or_import_tablespace(bool discard, dd::Table* table_def);
+    int truncate(dd::Table* table_def);
     int delete_all_rows();
     void extract_hidden_primary_key(uint keynr, DBT const *found_key);
     void read_key_only(uchar * buf, uint keynr, DBT const *found_key);
