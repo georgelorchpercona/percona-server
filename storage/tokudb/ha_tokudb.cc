@@ -1152,7 +1152,8 @@ static int generate_row_for_put(
         );
 }
 
-ha_tokudb::ha_tokudb(handlerton * hton, TABLE_SHARE * table_arg):handler(hton, table_arg) {
+ha_tokudb::ha_tokudb(handlerton* hton, TABLE_SHARE* table_arg)
+    : handler(hton, table_arg), ds_mrr(this) {
     TOKUDB_HANDLER_DBUG_ENTER("");
     share = NULL;
     int_table_flags = HA_REC_NOT_IN_SEQ  | HA_NULL_IN_KEY | HA_CAN_INDEX_BLOBS
