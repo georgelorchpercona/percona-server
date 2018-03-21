@@ -58,6 +58,7 @@ SERVICE_TYPE(log_builtins_string) *log_bs= nullptr;
 static handler* tokudb_create_handler(
     handlerton* hton,
     TABLE_SHARE* table,
+    bool partitioned,
     MEM_ROOT* mem_root);
 
 static void tokudb_print_error(
@@ -645,6 +646,7 @@ static int tokudb_done_func(TOKUDB_UNUSED(void* p)) {
 static handler* tokudb_create_handler(
     handlerton* hton,
     TABLE_SHARE* table,
+    TOKUDB_UNUSED(bool partitioned),
     MEM_ROOT* mem_root) {
     return new(mem_root) ha_tokudb(hton, table);
 }
