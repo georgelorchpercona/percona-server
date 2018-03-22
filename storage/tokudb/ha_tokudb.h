@@ -760,9 +760,6 @@ public:
     uint max_supported_key_part_length() const {
         return UINT_MAX32;
     } 
-    const key_map *keys_to_use_for_scanning() {
-        return &key_map_full;
-    }
 
     double scan_time();
 
