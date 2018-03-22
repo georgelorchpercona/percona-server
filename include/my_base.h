@@ -918,9 +918,10 @@ is the global server default. */
   Information in the data-dictionary needs to be updated.
 */
 #define HA_ERR_ROW_FORMAT_CHANGED 202
-#define HA_ERR_NO_WAIT_LOCK 203     /* Don't wait for record lock */
-#define HA_ERR_DISK_FULL_NOWAIT 204 /* No more room in disk */
-#define HA_ERR_LAST 204             /* Copy of last error nr */
+#define HA_ERR_NO_WAIT_LOCK 203  /* Don't wait for record lock */
+#define HA_ERR_DISK_FULL_NOWAIT 204  /* No more room in disk */
+#define HA_ERR_DEST_SCHEMA_NOT_EXIST 205  /* Destination schema does not exist */
+#define HA_ERR_LAST 205  /* Copy of last error nr */
 
 /* Number of different errors */
 #define HA_ERR_ERRORS (HA_ERR_LAST - HA_ERR_FIRST + 1)
