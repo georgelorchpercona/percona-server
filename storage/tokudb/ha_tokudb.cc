@@ -3172,7 +3172,7 @@ ha_rows ha_tokudb::estimate_rows_upper_bound() {
 // Function that compares two primary keys that were saved as part of rnd_pos
 // and ::position
 //
-int ha_tokudb::cmp_ref(const uchar * ref1, const uchar * ref2) {
+int ha_tokudb::cmp_ref(const uchar* ref1, const uchar* ref2) const {
     int ret_val = 0;
     bool read_string = false;
     ret_val = tokudb_compare_two_keys(
@@ -6874,7 +6874,9 @@ void ha_tokudb::update_create_info(HA_CREATE_INFO* create_info) {
 // during drop table, we do not attempt to remove already dropped
 // indexes because we did not keep status.tokudb in sync with list of indexes.
 //
-int ha_tokudb::remove_key_name_from_status(DB* status_block, char* key_name, DB_TXN* txn) {
+int ha_tokudb::remove_key_name_from_status(DB* status_block,
+                                           const char* key_name,
+                                           DB_TXN* txn) {
     int error;
     uchar status_key_info[FN_REFLEN + sizeof(HA_METADATA_KEY)];
     HA_METADATA_KEY md_key = hatoku_key_name;
@@ -6900,7 +6902,9 @@ int ha_tokudb::remove_key_name_from_status(DB* status_block, char* key_name, DB_
 // writes the key name in status.tokudb, so that we may later delete or rename
 // the dictionary associated with key_name
 //
-int ha_tokudb::write_key_name_to_status(DB* status_block, char* key_name, DB_TXN* txn) {
+int ha_tokudb::write_key_name_to_status(DB* status_block,
+                                        const char* key_name,
+                                        DB_TXN* txn) {
     int error;
     uchar status_key_info[FN_REFLEN + sizeof(HA_METADATA_KEY)];
     HA_METADATA_KEY md_key = hatoku_key_name;
