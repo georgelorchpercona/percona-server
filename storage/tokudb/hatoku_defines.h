@@ -43,6 +43,7 @@ Copyright (c) 2006, 2015, Percona and/or its affiliates. All rights reserved.
 #include "sql/sql_table.h"
 #include "sql/table.h"
 
+#include "my_icp.h"
 #include "my_thread.h"
 #include "mysql/components/my_service.h"
 #include "mysql/components/services/log_builtins.h"
