@@ -41,6 +41,7 @@ Copyright (c) 2006, 2015, Percona and/or its affiliates. All rights reserved.
 #include "sql/sql_lex.h"
 #include "sql/sql_show.h"
 #include "sql/sql_table.h"
+#include "sql/sql_thd_internal_api.h"
 #include "sql/table.h"
 
 #include "my_icp.h"
