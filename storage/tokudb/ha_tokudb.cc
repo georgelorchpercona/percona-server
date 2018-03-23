@@ -4677,7 +4677,6 @@ int ha_tokudb::index_init(uint keynr, bool sorted) {
             error = HA_ERR_LOCK_WAIT_TIMEOUT;
             my_error(ER_LOCK_WAIT_TIMEOUT, MYF(0));
         }
-        table->status = STATUS_NOT_FOUND;
         error = map_to_handler_error(error);
         last_cursor_error = error;
         cursor = NULL;             // Safety
@@ -4742,7 +4741,6 @@ int ha_tokudb::handle_cursor_error(int error, int err_to_return) {
     if (error) {
         error = map_to_handler_error(error);
         last_cursor_error = error;
-        table->status = STATUS_NOT_FOUND;
         if (error == DB_NOTFOUND) {
             error = err_to_return;
         }
@@ -4796,7 +4794,6 @@ int ha_tokudb::read_row_callback (uchar * buf, uint keynr, DBT const *row, DBT c
 //
 void ha_tokudb::read_key_only(uchar * buf, uint keynr, DBT const *found_key) {
     TOKUDB_HANDLER_DBUG_ENTER("");
-    table->status = 0;
     //
     // only case when we do not unpack the key is if we are dealing with the main dictionary
     // of a table with a hidden primary key
@@ -4820,7 +4817,6 @@ void ha_tokudb::read_key_only(uchar * buf, uint keynr, DBT const *found_key) {
 int ha_tokudb::read_primary_key(uchar * buf, uint keynr, DBT const *row, DBT const *found_key) {
     TOKUDB_HANDLER_DBUG_ENTER("");
     int error = 0;
-    table->status = 0;
     //
     // case where we read from secondary table that is not clustered
     //
@@ -4908,7 +4904,6 @@ int ha_tokudb::read_full_row(uchar * buf) {
                     tokudb_active_index);
             }
         }
-        table->status = STATUS_NOT_FOUND;
     }
 
     TOKUDB_HANDLER_DBUG_RETURN(error);
