@@ -1255,6 +1255,7 @@ bool ha_tokudb::inplace_alter_table(
         error = do_optimize(ha_thd());
     }
 
+#if defined(TOKU_INCLUDE_WRITE_FRM_DATA) && TOKU_INCLUDE_WRITE_FRM_DATA
 #if defined(WITH_PARTITION_STORAGE_ENGINE) && WITH_PARTITION_STORAGE_ENGINE
     if (error == 0 && (altered_table->part_info == NULL)) {
 #else
@@ -1265,6 +1266,7 @@ bool ha_tokudb::inplace_alter_table(
             ctx->alter_txn,
             altered_table->s->path.str);
     }
+#endif  // defined(TOKU_INCLUDE_WRITE_FRM_DATA) && TOKU_INCLUDE_WRITE_FRM_DATA
 
     bool result = false; // success
     if (error) {
@@ -1488,7 +1490,11 @@ int ha_tokudb::alter_table_add_or_drop_column(
 // If abort then abort the alter transaction and try to rollback the
 //    non-transactional changes.
 bool ha_tokudb::commit_inplace_alter_table(
+#if defined(TOKU_INCLUDE_WRITE_FRM_DATA) && TOKU_INCLUDE_WRITE_FRM_DATA
     TABLE* altered_table,
+#else
+    TOKUDB_UNUSED(TABLE* altered_table),
+#endif  // defined(TOKU_INCLUDE_WRITE_FRM_DATA) && TOKU_INCLUDE_WRITE_FRM_DATA
     Alter_inplace_info* ha_alter_info,
     bool commit) {
 
@@ -1503,6 +1509,17 @@ bool ha_tokudb::commit_inplace_alter_table(
         if (ha_alter_info->group_commit_ctx) {
             ha_alter_info->group_commit_ctx = NULL;
         }
+#if defined(TOKU_INCLUDE_WRITE_FRM_DATA) && TOKU_INCLUDE_WRITE_FRM_DATA
+        int error = write_frm_data(
+            share->status_block,
+            ctx->alter_txn,
+            altered_table->s->path.str);
+        if (error) {
+            commit = false;
+            result = true;
+            print_error(error, MYF(0));
+        }
+#endif  // defined(TOKU_INCLUDE_WRITE_FRM_DATA) && TOKU_INCLUDE_WRITE_FRM_DATA
     }
 
     if (!commit) {
