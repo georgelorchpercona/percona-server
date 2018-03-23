@@ -864,9 +864,6 @@ public:
     bool is_optimize_blocking();
     bool is_auto_inc_singleton();
     void print_error(int error, myf errflag);
-    uint8 table_cache_type() {
-        return HA_CACHE_TBL_TRANSACT;
-    }
     bool primary_key_is_clustered() const {
         return true;
     }
