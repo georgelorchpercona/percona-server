@@ -63,6 +63,10 @@ SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-undef")
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-parameter")
 SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-parameter")
 
+# Relax suggest-attribute=format warnings for 8.0 until RocksDB catches up
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-suggest-attribute=format")
+SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-suggest-attribute=format")
+
 # check that compiler supports cxx11 and set options
 INCLUDE (check_stdcxx11)
 IF (!HAVE_STDCXX11)
