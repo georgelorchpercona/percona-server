@@ -55,6 +55,10 @@ ENDIF()
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-variable")
 SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-variable")
 
+# Relax undefined definition warnings for 8.0 until RocksDB catches up
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-undef")
+SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-undef")
+
 # check that compiler supports cxx11 and set options
 INCLUDE (check_stdcxx11)
 IF (!HAVE_STDCXX11)
