@@ -22,8 +22,7 @@
 #include <string>
 
 /* MySQL header files */
-#include "handler.h"
-#include "my_global.h"
+#include "sql/handler.h"
 #include "my_io_perf.h"
 
 namespace myrocks {

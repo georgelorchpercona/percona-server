@@ -28,6 +28,7 @@ Created 2012/04/12 by Sunny Bains
 #define UT0COUNTER_H
 
 #include <string.h>
+#include "my_dbug.h"
 
 /** CPU cache line size */
 #define CACHE_LINE_SIZE		64
@@ -48,10 +49,10 @@ template <typename Type, int N>
 struct generic_indexer_t {
 	/** Default constructor/destructor should be OK. */
 
-        /** @return offset within m_counter */
-        size_t offset(size_t index) const {
-                return(((index % N) + 1) * (CACHE_LINE_SIZE / sizeof(Type)));
-        }
+	/** @return offset within m_counter */
+	size_t offset(size_t index) const {
+		return(((index % N) + 1) * (CACHE_LINE_SIZE / sizeof(Type)));
+	}
 };
 
 #ifdef HAVE_SCHED_GETCPU
@@ -94,11 +95,11 @@ template <typename Type, int N=1>
 struct single_indexer_t {
 	/** Default constructor/destructor should are OK. */
 
-        /** @return offset within m_counter */
-        size_t offset(size_t index) const {
+	/** @return offset within m_counter */
+	size_t offset(size_t index) const {
 		DBUG_ASSERT(N == 1);
-                return((CACHE_LINE_SIZE / sizeof(Type)));
-        }
+		return((CACHE_LINE_SIZE / sizeof(Type)));
+	}
 
 	/* @return 1 */
 	size_t get_rnd_index() const {
@@ -203,7 +204,7 @@ private:
 	/** Indexer into the array */
 	Indexer<Type, N>m_policy;
 
-        /** Slot 0 is unused. */
+	/** Slot 0 is unused. */
 	Type		m_counter[(N + 1) * (CACHE_LINE_SIZE / sizeof(Type))];
 };
 

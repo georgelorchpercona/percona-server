@@ -33,15 +33,16 @@
 #include <vector>
 
 /* MySQL includes */
-#include "debug_sync.h"
 #include "my_bit.h"
 #include "my_stacktrace.h"
 #include "my_sys.h"
-#include "mysql/psi/mysql_table.h"
 #include "mysql/thread_pool_priv.h"
 #include "mysys_err.h"
-#include "sql_audit.h"
-#include "sql_table.h"
+#include "sql/debug_sync.h"
+#include "sql/sql_audit.h"
+#include "sql/sql_lex.h"
+#include "sql/sql_table.h"
+#include "sql/table.h"
 
 // Both MySQL and RocksDB define the same constant. To avoid compilation errors
 // till we make the fix in RocksDB, we'll temporary undefine it here.
