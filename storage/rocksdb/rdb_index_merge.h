@@ -17,7 +17,6 @@
 #pragma once
 
 /* MySQL header files */
-#include "sql/log.h"
 #include "sql/handler.h"   /* handler */
 
 /* C++ standard header files */

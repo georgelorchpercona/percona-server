@@ -24,9 +24,6 @@
 /* C++ system header files */
 #include <string>
 
-/* MySQL header files */
-#include "log.h"
-
 /* RocksDB header files */
 #include "rocksdb/utilities/convenience.h"
 
@@ -138,8 +135,8 @@ bool Rdb_cf_options::find_column_family(const std::string &input,
   }
 
   if (end_pos == beg_pos - 1) {
-    // NO_LINT_DEBUG
-    sql_print_warning("No column family found (options: %s)", input.c_str());
+    LogPluginErrMsg(WARNING_LEVEL, 0, "No column family found (options: %s)",
+                    input.c_str());
     return false;
   }
 
@@ -157,9 +154,9 @@ bool Rdb_cf_options::find_options(const std::string &input, size_t *const pos,
 
   // Make sure we have an open curly brace at the current position.
   if (*pos < input.size() && input[*pos] != '{') {
-    // NO_LINT_DEBUG
-    sql_print_warning("Invalid cf options, '{' expected (options: %s)",
-                      input.c_str());
+    LogPluginErrMsg(WARNING_LEVEL, 0,
+                    "Invalid cf options, '{' expected (options: %s)",
+                    input.c_str());
     return false;
   }
 
@@ -201,9 +198,9 @@ bool Rdb_cf_options::find_options(const std::string &input, size_t *const pos,
 
   // We never found the correct number of closing curly braces.
   // Generate an error.
-  // NO_LINT_DEBUG
-  sql_print_warning("Mismatched cf options, '}' expected (options: %s)",
-                    input.c_str());
+  LogPluginErrMsg(WARNING_LEVEL, 0,
+                  "Mismatched cf options, '}' expected (options: %s)",
+                  input.c_str());
   return false;
 }
 
@@ -224,9 +221,9 @@ bool Rdb_cf_options::find_cf_options_pair(const std::string &input,
 
   // If we are at the end of the input then we generate an error.
   if (*pos == input.size()) {
-    // NO_LINT_DEBUG
-    sql_print_warning("Invalid cf options, '=' expected (options: %s)",
-                      input.c_str());
+    LogPluginErrMsg(WARNING_LEVEL, 0,
+                    "Invalid cf options, '=' expected (options: %s)",
+                    input.c_str());
     return false;
   }
 
@@ -245,9 +242,9 @@ bool Rdb_cf_options::find_cf_options_pair(const std::string &input,
   // We should either be at the end of the input string or at a semicolon.
   if (*pos < input.size()) {
     if (input[*pos] != ';') {
-      // NO_LINT_DEBUG
-      sql_print_warning("Invalid cf options, ';' expected (options: %s)",
-                        input.c_str());
+      LogPluginErrMsg(WARNING_LEVEL, 0,
+                      "Invalid cf options, ';' expected (options: %s)",
+                      input.c_str());
       return false;
     }
 
@@ -277,8 +274,8 @@ bool Rdb_cf_options::parse_cf_options(const std::string &cf_options,
 
     // Generate an error if we have already seen this column family.
     if (option_map->find(cf) != option_map->end()) {
-      // NO_LINT_DEBUG
-      sql_print_warning(
+      LogPluginErrMsg(
+          WARNING_LEVEL, 0,
           "Duplicate entry for %s in override options (options: %s)",
           cf.c_str(), cf_options.c_str());
       return false;
@@ -287,8 +284,8 @@ bool Rdb_cf_options::parse_cf_options(const std::string &cf_options,
     // Generate an error if the <opt_str> is not valid according to RocksDB.
     if (!rocksdb::GetColumnFamilyOptionsFromString(options, opt_str, &options)
              .ok()) {
-      // NO_LINT_DEBUG
-      sql_print_warning(
+      LogPluginErrMsg(
+          WARNING_LEVEL, 0,
           "Invalid cf config for %s in override options (options: %s)",
           cf.c_str(), cf_options.c_str());
       return false;
