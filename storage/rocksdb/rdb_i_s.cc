@@ -22,8 +22,8 @@
 #include <vector>
 
 /* MySQL header files */
-#include <sql_string.h>
-#include <sql_show.h>
+#include "sql_string.h"
+#include "sql_show.h"
 
 /* RocksDB header files */
 #include "rocksdb/compaction_filter.h"

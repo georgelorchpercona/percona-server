@@ -28,10 +28,9 @@
 #include <vector>
 
 /* MySQL header files */
-#include "./handler.h"   /* handler */
-#include "./my_global.h" /* ulonglong */
-#include "./sql_string.h"
-#include "./ib_ut0counter.h"
+#include "handler.h"   /* handler */
+#include "my_global.h" /* ulonglong */
+#include "sql_string.h"
 #include "sql_bitmap.h"
 #include "my_icp.h"
 #include "field.h"
@@ -52,6 +51,7 @@
 #include "./rdb_perf_context.h"
 #include "./rdb_sst_info.h"
 #include "./rdb_utils.h"
+#include "./ib_ut0counter.h"
 
 /**
   @note MyRocks Coding Conventions:
