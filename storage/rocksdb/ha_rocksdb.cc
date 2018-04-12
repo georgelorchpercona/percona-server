@@ -3068,7 +3068,8 @@ static int rocksdb_prepare(handlerton *const hton, THD *const thd,
  do nothing for prepare/commit by xid
  this is needed to avoid crashes in XA scenarios
 */
-static int rocksdb_commit_by_xid(handlerton *const hton, XID *const xid) {
+static xa_status_code rocksdb_commit_by_xid(handlerton *const hton,
+                                            XID *const xid) {
   DBUG_ENTER_FUNC();
 
   DBUG_ASSERT(hton != nullptr);
@@ -3083,14 +3084,14 @@ static int rocksdb_commit_by_xid(handlerton *const hton, XID *const xid) {
   rocksdb::Transaction *const trx = rdb->GetTransactionByName(name);
 
   if (trx == nullptr) {
-    DBUG_RETURN(HA_EXIT_FAILURE);
+    DBUG_RETURN(XAER_NOTA);
   }
 
   const rocksdb::Status s = trx->Commit();
 
   if (!s.ok()) {
     rdb_log_status_error(s);
-    DBUG_RETURN(HA_EXIT_FAILURE);
+    DBUG_RETURN(XAER_RMERR);
   }
 
   delete trx;
@@ -3098,12 +3099,12 @@ static int rocksdb_commit_by_xid(handlerton *const hton, XID *const xid) {
   // `Add()` is implemented in a thread-safe manner.
   commit_latency_stats->Add(timer.ElapsedNanos() / 1000);
 
-  DBUG_RETURN(HA_EXIT_SUCCESS);
+  DBUG_RETURN(XA_OK);
 }
 
-static int rocksdb_rollback_by_xid(handlerton *const hton
-                                   MY_ATTRIBUTE((__unused__)),
-                                   XID *const xid) {
+static xa_status_code
+rocksdb_rollback_by_xid(handlerton *const hton MY_ATTRIBUTE((__unused__)),
+                        XID *const xid) {
   DBUG_ENTER_FUNC();
 
   DBUG_ASSERT(hton != nullptr);
@@ -3115,19 +3116,19 @@ static int rocksdb_rollback_by_xid(handlerton *const hton
   rocksdb::Transaction *const trx = rdb->GetTransactionByName(name);
 
   if (trx == nullptr) {
-    DBUG_RETURN(HA_EXIT_FAILURE);
+    DBUG_RETURN(XAER_NOTA);
   }
 
   const rocksdb::Status s = trx->Rollback();
 
   if (!s.ok()) {
     rdb_log_status_error(s);
-    DBUG_RETURN(HA_EXIT_FAILURE);
+    DBUG_RETURN(XAER_RMERR);
   }
 
   delete trx;
 
-  DBUG_RETURN(HA_EXIT_SUCCESS);
+  DBUG_RETURN(XA_OK);
 }
 
 /**
