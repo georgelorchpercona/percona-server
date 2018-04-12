@@ -177,6 +177,8 @@ class ha_innobase : public handler {
 
   int rnd_pos(uchar *buf, uchar *pos);
 
+  bool has_gap_locks() const { return true; }
+
   int ft_init();
 
   void ft_end();

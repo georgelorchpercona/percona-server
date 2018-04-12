@@ -560,6 +560,8 @@ class ha_innopart : public ha_innobase,
 
   int read_range_next() { return (Partition_helper::ph_read_range_next()); }
 
+  bool has_gap_locks() const { return true; }
+
   uint32 calculate_key_hash_value(Field **field_array) {
     return (Partition_helper::ph_calculate_key_hash_value(field_array));
   }
