@@ -43,6 +43,7 @@
 #include "sql/sql_audit.h"
 #include "sql/sql_lex.h"
 #include "sql/sql_table.h"
+#include "sql/sql_thd_internal_api.h"
 #include "sql/table.h"
 
 // Both MySQL and RocksDB define the same constant. To avoid compilation errors
@@ -75,23 +76,6 @@
 #include "./rdb_mutex_wrapper.h"
 #include "./rdb_psi.h"
 #include "./rdb_threads.h"
-
-// Internal MySQL APIs not exposed in any header.
-extern "C" {
-/**
- *   Get the user thread's binary logging format
- *   @param thd  user thread
- *   @return Value to be used as index into the binlog_format_names array
-*/
-int thd_binlog_format(const MYSQL_THD thd);
-
-/**
- *   Check if binary logging is filtered for thread's current db.
- *   @param  thd   Thread handle
- *   @retval 1 the query is not filtered, 0 otherwise.
-*/
-bool thd_binlog_filter_ok(const MYSQL_THD thd);
-}
 
 // MySQL 8.0 logger service interface
 static SERVICE_TYPE(registry) *reg_srv= nullptr;
