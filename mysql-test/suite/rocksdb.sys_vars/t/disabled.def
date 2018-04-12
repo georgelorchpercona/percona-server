@@ -1,0 +1,3 @@
+rocksdb_read_free_rpl_tables_basic : disabled until RFR is supported again
+
+rocksdb_validate_tables_basic : disabled until validation is figured out
