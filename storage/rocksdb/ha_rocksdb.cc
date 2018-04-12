@@ -4600,7 +4600,6 @@ void ha_rocksdb::load_auto_incr_value() {
 ulonglong ha_rocksdb::load_auto_incr_value_from_index() {
   const int save_active_index = active_index;
   active_index = table->s->next_number_index;
-  const uint8 save_table_status = table->status;
   ulonglong last_val = 0;
 
   Rdb_transaction *const tx = get_or_create_tx(table->in_use);
@@ -4644,7 +4643,6 @@ ulonglong ha_rocksdb::load_auto_incr_value_from_index() {
     tx->release_snapshot();
   }
 
-  table->status = save_table_status;
   active_index = save_active_index;
 
   /*
@@ -4696,7 +4694,6 @@ void ha_rocksdb::update_auto_incr_val_from_field() {
 int ha_rocksdb::load_hidden_pk_value() {
   const int save_active_index = active_index;
   active_index = m_tbl_def->m_key_count - 1;
-  const uint8 save_table_status = table->status;
 
   Rdb_transaction *const tx = get_or_create_tx(table->in_use);
   const bool is_new_snapshot = !tx->has_snapshot();
@@ -4727,7 +4724,6 @@ int ha_rocksdb::load_hidden_pk_value() {
     tx->release_snapshot();
   }
 
-  table->status = save_table_status;
   active_index = save_active_index;
 
   release_scan_iterator();
@@ -7274,9 +7270,6 @@ int ha_rocksdb::secondary_index_read(const int keyno, uchar *const buf) {
   DBUG_ASSERT(buf != nullptr);
   DBUG_ASSERT(table != nullptr);
 
-  /* Use STATUS_NOT_FOUND when record not found or some error occurred */
-  table->status = STATUS_NOT_FOUND;
-
   if (is_valid(m_scan_it)) {
     rocksdb::Slice key = m_scan_it->key();
 
@@ -7308,7 +7301,6 @@ int ha_rocksdb::secondary_index_read(const int keyno, uchar *const buf) {
       }
 
       if (!rc) {
-        table->status = 0;
         update_row_stats(ROWS_READ);
       }
       return rc;
@@ -7513,8 +7505,6 @@ int ha_rocksdb::index_read_map_impl(uchar *const buf, const uchar *const key,
                                 slice, &move_forward, tx->m_snapshot_timestamp);
 
     if (rc) {
-      /* This status is returned on any error */
-      table->status = STATUS_NOT_FOUND;
       DBUG_RETURN(rc);
     }
 
@@ -7538,13 +7528,7 @@ int ha_rocksdb::index_read_map_impl(uchar *const buf, const uchar *const key,
     release_scan_iterator();
   }
 
-  if (rc) {
-    /* the only possible error condition is record-not-found */
-    table->status = STATUS_NOT_FOUND;
-  } else {
-    table->status = 0;
-    update_row_stats(ROWS_READ);
-  }
+  update_row_stats(ROWS_READ);
 
   DBUG_RETURN(rc);
 }
@@ -7580,13 +7564,11 @@ int ha_rocksdb::find_icp_matching_index_rec(const bool &move_forward,
       rocksdb_skip_expired_records(kd, m_scan_it, !move_forward);
 
       if (!is_valid(m_scan_it)) {
-        table->status = STATUS_NOT_FOUND;
         return HA_ERR_END_OF_FILE;
       }
       const rocksdb::Slice rkey = m_scan_it->key();
 
       if (!kd.covers_key(rkey)) {
-        table->status = STATUS_NOT_FOUND;
         return HA_ERR_END_OF_FILE;
       }
 
@@ -7594,7 +7576,6 @@ int ha_rocksdb::find_icp_matching_index_rec(const bool &move_forward,
         const rocksdb::Slice prefix((const char *)m_sk_match_prefix,
                                     m_sk_match_length);
         if (!kd.value_matches_prefix(rkey, prefix)) {
-          table->status = STATUS_NOT_FOUND;
           return HA_ERR_END_OF_FILE;
         }
       }
@@ -7612,7 +7593,6 @@ int ha_rocksdb::find_icp_matching_index_rec(const bool &move_forward,
         continue; /* Get the next (or prev) index tuple */
       } else if (icp_status == ICP_OUT_OF_RANGE) {
         /* We have walked out of range we are scanning */
-        table->status = STATUS_NOT_FOUND;
         return HA_ERR_END_OF_FILE;
       } else /* icp_status == ICP_MATCH */
       {
@@ -7917,7 +7897,6 @@ int ha_rocksdb::get_row_by_rowid(uchar *const buf, const char *const rowid,
   }
   found = !s.IsNotFound();
 
-  table->status = STATUS_NOT_FOUND;
   if (found) {
     /* If we found the record, but it's expired, pretend we didn't find it.  */
     if (!skip_ttl_check && m_pk_descr->has_ttl() &&
@@ -7928,10 +7907,6 @@ int ha_rocksdb::get_row_by_rowid(uchar *const buf, const char *const rowid,
 
     m_last_rowkey.copy((const char *)rowid, rowid_size, &my_charset_bin);
     rc = convert_record_from_storage_format(&key_slice, buf);
-
-    if (!rc) {
-      table->status = 0;
-    }
   } else {
     /*
       Note: we don't need to unlock the row. It is intentional that we keep
@@ -9241,8 +9216,6 @@ int ha_rocksdb::rnd_next_with_direction(uchar *const buf, bool move_forward) {
 
   int rc;
 
-  table->status = STATUS_NOT_FOUND;
-
   if (!m_scan_it || !is_valid(m_scan_it)) {
     /*
       We can get here when SQL layer has called
@@ -9329,7 +9302,6 @@ int ha_rocksdb::rnd_next_with_direction(uchar *const buf, bool move_forward) {
       rc = convert_record_from_storage_format(&key, &value, buf);
     }
 
-    table->status = 0;
     break;
   }
 
