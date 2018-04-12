@@ -39,6 +39,7 @@
 #include "mysql/thread_pool_priv.h"
 #include "mysys_err.h"
 #include "sql/debug_sync.h"
+#include "sql/mysqld.h"
 #include "sql/sql_audit.h"
 #include "sql/sql_lex.h"
 #include "sql/sql_table.h"
