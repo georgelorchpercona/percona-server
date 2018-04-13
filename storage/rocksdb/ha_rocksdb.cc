@@ -40,7 +40,6 @@
 #include "my_sys.h"
 #include "sql_audit.h"
 #include "sql_table.h"
-#include "mysql/psi/mysql_table.h"
 #include "mysql/thread_pool_priv.h"
 #include "mysys_err.h"
 
