@@ -19,6 +19,7 @@
 
 /* MySQL header files */
 #include "sql/current_thd.h"
+#include "my_systime.h"
 
 /* MyRocks header files */
 #include "./ha_rocksdb.h"
