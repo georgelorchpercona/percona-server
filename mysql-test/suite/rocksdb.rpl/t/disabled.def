@@ -1,0 +1,2 @@
+rpl_rocksdb_snapshot : LOCK BINLOG FOR BACKUP
+rpl_skip_trx_api_binlog_format : PS-4252 - Port server writebatch changes to 8.0

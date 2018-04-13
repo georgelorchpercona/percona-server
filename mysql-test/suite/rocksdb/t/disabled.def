@@ -8,8 +8,38 @@ rpl_read_free : MYR-6 - Percona Server does not yet have uniform implementation 
 slow_query_log : MYR-26 - Percona Server does not support --log-slow-extra
 
 # 8.0
+allow_to_start_after_corruption : PS-4584 - Port PLUGVAR_LOAD_PATH and PLUGVAR_LOAD_ADD_PATH to 8.0
 bloomfilter3 : PS-4618 - Port PS-4070 a.k.a. MYR-63 to 8.0
 nonflushing_analyze_debug : PS-4223 - Remove ONLINE_ANALYZE until such time it is ported to 8.0
 nonflushing_analyze_parts_debug : PS-4223 - Remove ONLINE_ANALYZE until such time it is ported to 8.0
 skip_validate_tmp_table : PS-4218 - Make .frm/schema validation optional at compile time
 validate_datadic : PS-4218 - Make .frm/schema validation optional at compile time
+
+add_index_inplace : native partitioning
+add_index_inplace_crash : native partitioning
+autoinc_crash_safe_partition : native partitioning
+bulk_load : native partitioning
+bulk_load_rev_cf : native partitioning
+bulk_load_rev_cf_and_data : native partitioning
+bulk_load_rev_data : native partitioning
+bulk_load_unsorted : native partitioning
+bulk_load_unsorted_rev : native partitioning
+gap_lock_error : native partitioning
+get_error_message : native partitioning
+issue495 : native partitioning
+partition : native partitioning
+rocksdb : native partitioning
+rocksdb_cf_per_partition : native partitioning
+rocksdb_parts : native partitioning
+show_engine : native partitioning
+tbl_opt_data_index_dir : native partitioning
+ttl_primary_with_partitions : native partitioning
+ttl_secondary_with_partitions : native partitioning
+unique_sec : native partitioning
+
+read_only_tx : needs STWCS binlog_snapshot_* patch
+
+rocksdb_icp : needs userstat patch
+rocksdb_icp_rev : needs userstat patch
+show_table_status : needs userstat patch
+table_index_statistics : needs userstat patch

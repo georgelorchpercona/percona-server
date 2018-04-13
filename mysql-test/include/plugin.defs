@@ -123,3 +123,6 @@ component_test_system_variable_source component_output_directory TEST_SYSTEM_VAR
 
 # password validation component
 component_validate_password     component_output_directory  VALIDATE_PASSWORD_COMPONENT
+
+
+ha_rocksdb         plugin_output_directory             ROCKSDB           rocksdb,rocksdb_cfstats,rocksdb_dbstats,rocksdb_perf_context,rocksdb_perf_context_global,rocksdb_cf_options,rocksdb_compaction_stats,rocksdb_global_info,rocksdb_ddl,rocksdb_index_file_map,rocksdb_locks,rocksdb_trx,rocksdb_deadlock
