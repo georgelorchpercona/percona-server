@@ -17,6 +17,9 @@
 /* This C++ file's header file */
 #include "./rdb_mutex_wrapper.h"
 
+/* MySQL header files */
+#include "sql/current_thd.h"
+
 /* MyRocks header files */
 #include "./ha_rocksdb.h"
 #include "./rdb_utils.h"
