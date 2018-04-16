@@ -629,6 +629,7 @@ static const SYMBOL symbols[] = {
   { SYM("TO",                       TO_SYM)},
   { SYM("TOKUDB_FAST",              TOKU_FAST_SYM)},
   { SYM("TOKUDB_LZMA",              TOKU_LZMA_SYM)},
+  { SYM("TOKUDB_LZ4",               TOKU_LZ4_SYM)},
   { SYM("TOKUDB_QUICKLZ",           TOKU_QUICKLZ_SYM)},
   { SYM("TOKUDB_SMALL",             TOKU_SMALL_SYM)},
   { SYM("TOKUDB_SNAPPY",            TOKU_SNAPPY_SYM)},
