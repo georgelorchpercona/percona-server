@@ -1,0 +1,17 @@
+include/master-slave.inc
+Warnings:
+Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
+Note	####	Storing MySQL user name or password information in the master info repository is not secure and is therefore not recommended. Please consider using the USER and PASSWORD connection options for START SLAVE; see the 'START SLAVE Syntax' in the MySQL Manual for more information.
+[connection master]
+# Establish connection con1 (user=root)
+# Establish connection con2 (user=root)
+# Switch to connection con1
+SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+CREATE TABLE t1 (a INT PRIMARY KEY) ENGINE=ROCKSDB;
+START TRANSACTION WITH CONSISTENT SNAPSHOT;
+# Switch to connection con2
+INSERT INTO t1 VALUES (0), (1), (2), (3);
+# Switch to connection con1
+COMMIT;
+DROP TABLE t1;
+include/rpl_end.inc

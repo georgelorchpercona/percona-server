@@ -1,0 +1,59 @@
+--source include/not_group_replication_plugin.inc
+--source include/have_rocksdb.inc
+--source include/have_gtid.inc
+--source include/have_binlog_format_row.inc
+--source include/master-slave.inc
+
+--source include/count_sessions.inc
+
+--echo # Establish connection con1 (user=root)
+connect (con1,localhost,root,,);
+--echo # Establish connection con2 (user=root)
+connect (con2,localhost,root,,);
+
+
+--echo # Switch to connection con1
+connection con1;
+
+SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+CREATE TABLE t1 (a INT PRIMARY KEY) ENGINE=ROCKSDB;
+
+START TRANSACTION WITH CONSISTENT SNAPSHOT;
+--let $gtid_executed_1 = query_get_value(SHOW MASTER STATUS, Executed_Gtid_Set, 1)
+SHOW MASTER STATUS;
+SHOW VARIABLES LIKE'snapshot%';
+
+--echo # Switch to connection con2
+connection con2;
+
+INSERT INTO t1 VALUES (0), (1), (2), (3);
+
+--echo # Switch to connection con1
+connection con1;
+--let $gtid_executed_2 = query_get_value(SHOW MASTER STATUS, Executed_Gtid_Set, 1)
+
+--let $assert_text= Executed_Gtid_Set MUST be the same
+--let $assert_cond= "$gtid_executed_1" = "$gtid_executed_2"
+SHOW MASTER STATUS;
+SHOW VARIABLES LIKE'snapshot%';
+--source include/assert.inc
+
+COMMIT;
+
+--let $gtid_executed_2 = query_get_value(SHOW MASTER STATUS, Executed_Gtid_Set, 1)
+
+--let $assert_text= Executed_Gtid_Set must NOT be the same
+--let $assert_cond= "$gtid_executed_1" != "$gtid_executed_2"
+SHOW MASTER_STATUS;
+SHOW VARIABLES LIKE'snapshot%';
+--source include/assert.inc
+
+DROP TABLE t1;
+
+
+connection default;
+disconnect con1;
+disconnect con2;
+
+--source include/wait_until_count_sessions.inc
+--source include/rpl_end.inc
