@@ -1247,7 +1247,7 @@ static MYSQL_THDVAR_UINT(force_index_records_in_range, PLUGIN_VAR_RQCMDARG,
 
 static MYSQL_SYSVAR_UINT(
     debug_optimizer_n_rows, rocksdb_debug_optimizer_n_rows,
-    PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY | PLUGIN_VAR_NOSYSVAR,
+    PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY | PLUGIN_VAR_EXPERIMENTAL,
     "Test only to override rocksdb estimates of table size in a memtable",
     nullptr, nullptr, 0, /* min */ 0, /* max */ INT_MAX, 0);
 
