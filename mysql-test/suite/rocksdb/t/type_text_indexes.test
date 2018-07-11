@@ -55,7 +55,7 @@ CREATE TABLE t1 (
   m MEDIUMTEXT,
   l LONGTEXT,
   pk MEDIUMTEXT,
-  PRIMARY KEY mt (pk(1)),
+  PRIMARY KEY mt (pk(2)),
   INDEX (m(128))
 ) ENGINE=rocksdb;
 
@@ -155,10 +155,7 @@ CREATE TABLE t1 (
   PRIMARY KEY b (b(32))
 ) ENGINE=rocksdb;
 
---error ER_DUP_ENTRY
 INSERT INTO t1 (b) VALUES (''), (_binary 0x0), (' ');
-
-INSERT INTO t1 (b) VALUES (''), (_binary 0x0);
 SELECT hex(b) FROM t1;
 
 DROP TABLE t1;
