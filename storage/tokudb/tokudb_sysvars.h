@@ -135,7 +135,7 @@ bool        rpl_unique_checks(THD* thd);
 ulonglong   rpl_unique_checks_delay(THD* thd);
 #endif  // defined(TOKU_INCLUDE_RFR) && TOKU_INCLUDE_RFR
 
-extern st_mysql_sys_var* system_variables[];
+extern SYS_VAR* system_variables[];
 
 } // namespace sysvars
 } // namespace tokudb
