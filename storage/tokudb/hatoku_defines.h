@@ -32,6 +32,7 @@ Copyright (c) 2006, 2015, Percona and/or its affiliates. All rights reserved.
 #define MYSQL_SERVER 1
 #include "mysql_version.h"
 
+#include "sql/current_thd.h"
 #include "sql/debug_sync.h"
 #include "sql/handler.h"
 #include "sql/item_cmpfunc.h"
