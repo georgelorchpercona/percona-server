@@ -757,7 +757,8 @@ public:
     //
     // Returns limit on key part length imposed by tokudb.
     //
-    uint max_supported_key_part_length() const {
+    uint max_supported_key_part_length(
+        HA_CREATE_INFO* create_info MY_ATTRIBUTE((__unused__))) const override {
         return UINT_MAX32;
     } 
 
