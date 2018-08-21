@@ -8782,16 +8782,16 @@ bool handler::is_using_prohibited_gap_locks(TABLE* table,
   THD* thd = table->in_use;
   thr_lock_type lock_type = table->reginfo.lock_type;
 
-  if (!using_full_primary_key
-      && has_transactions()
-      && !has_gap_locks()
-      && thd_tx_isolation(thd) >= ISO_REPEATABLE_READ
-      && !thd->rli_slave
-      && (thd->lex->table_count >= 2 || thd->in_multi_stmt_transaction_mode())
-      && (lock_type >= TL_WRITE_ALLOW_WRITE ||
-          lock_type == TL_READ_WITH_SHARED_LOCKS ||
-          lock_type == TL_READ_NO_INSERT ||
-          (lock_type != TL_IGNORE && thd->lex->sql_command != SQLCOM_SELECT)))
+  if (!using_full_primary_key && has_transactions() && !has_gap_locks() &&
+      thd_tx_isolation(thd) >= ISO_REPEATABLE_READ && !thd->rli_slave &&
+      (thd->lex->table_count >= 2 || thd->in_multi_stmt_transaction_mode()) &&
+      (lock_type >= TL_WRITE_ALLOW_WRITE ||
+       lock_type == TL_READ_WITH_SHARED_LOCKS ||
+       lock_type == TL_READ_NO_INSERT ||
+       (lock_type != TL_IGNORE && thd->lex->sql_command != SQLCOM_SELECT)) &&
+      thd->lex->sql_command != SQLCOM_ALTER_TABLE &&
+      thd->lex->sql_command != SQLCOM_CHECK &&
+      thd->lex->sql_command != SQLCOM_OPTIMIZE)
   {
     my_printf_error(ER_UNKNOWN_ERROR,
                     "Using Gap Lock without full unique key in multi-table "
