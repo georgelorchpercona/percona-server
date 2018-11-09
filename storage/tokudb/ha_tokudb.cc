@@ -6241,6 +6241,14 @@ int ha_tokudb::create(const char *name, TABLE *form,
   tokudb_trx_data *trx = NULL;
   THD *thd = ha_thd();
 
+  String database_name, table_name, dictionary_name;
+  tokudb_split_dname(name, database_name, table_name, dictionary_name);
+  if (database_name.is_empty() || table_name.is_empty()) {
+    push_warning(thd, Sql_condition::SL_WARNING, ER_TABLE_NAME,
+                 "TokuDB: Table Name or Database Name is empty");
+    DBUG_RETURN(ER_TABLE_NAME);
+  }
+
   const toku_compression_method compression_method =
       row_format_to_toku_compression_method(tokudb::sysvars::row_format(thd));
 
