@@ -581,9 +581,27 @@ bool Slave_worker::write_info(Rpl_info_handler *to) {
 */
 bool Slave_worker::reset_recovery_info() {
   DBUG_ENTER("Slave_worker::reset_recovery_info");
+  bool binlog_prot_acquired = false;
+
+  if (info_thd && !info_thd->backup_binlog_lock.is_acquired()) {
+    const ulong timeout = info_thd->variables.lock_wait_timeout;
+
+    DBUG_PRINT("debug", ("Acquiring binlog protection lock"));
+
+    if (info_thd->backup_binlog_lock.acquire_protection(info_thd, MDL_EXPLICIT,
+                                                        timeout))
+      DBUG_RETURN(true);
+
+    binlog_prot_acquired = true;
+  }
 
   set_group_master_log_name("");
   set_group_master_log_pos(0);
+
+  if (binlog_prot_acquired) {
+    DBUG_PRINT("debug", ("Releasing binlog protection lock"));
+    info_thd->backup_binlog_lock.release_protection(info_thd);
+  }
 
   DBUG_RETURN(flush_info(true));
 }
@@ -602,6 +620,19 @@ const char *Slave_worker::get_master_log_name() {
 bool Slave_worker::commit_positions(Log_event *ev, Slave_job_group *ptr_g,
                                     bool force) {
   DBUG_ENTER("Slave_worker::checkpoint_positions");
+  bool binlog_prot_acquired = false;
+
+  if (info_thd && !info_thd->backup_binlog_lock.is_acquired()) {
+    const ulong timeout = info_thd->variables.lock_wait_timeout;
+
+    DBUG_PRINT("debug", ("Acquiring binlog protection lock"));
+
+    if (info_thd->backup_binlog_lock.acquire_protection(info_thd, MDL_EXPLICIT,
+                                                        timeout))
+      DBUG_RETURN(true);
+
+    binlog_prot_acquired = true;
+  }
 
   /*
     Initial value of checkpoint_master_log_name is learned from
@@ -669,6 +700,11 @@ bool Slave_worker::commit_positions(Log_event *ev, Slave_job_group *ptr_g,
 
   DBUG_EXECUTE_IF("mts_debug_concurrent_access",
                   { mts_debug_concurrent_access++; };);
+
+  if (binlog_prot_acquired) {
+    DBUG_PRINT("debug", ("Releasing binlog protection lock"));
+    info_thd->backup_binlog_lock.release_protection(info_thd);
+  }
 
   DBUG_RETURN(flush_info(force));
 }

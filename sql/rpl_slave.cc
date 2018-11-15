@@ -1207,6 +1207,19 @@ int load_mi_and_rli_from_repositories(Master_info *mi, bool ignore_if_no_info,
   int init_error = 0;
   enum_return_check check_return = ERROR_CHECKING_REPOSITORY;
   THD *thd = current_thd;
+  bool binlog_prot_acquired = false;
+
+  if (thd && !thd->backup_binlog_lock.is_acquired()) {
+    const ulong timeout = thd->variables.lock_wait_timeout;
+
+    DBUG_PRINT("debug", ("Acquiring binlog protection lock"));
+    mysql_mutex_assert_not_owner(&mi->rli->data_lock);
+
+    if (thd->backup_binlog_lock.acquire_protection(thd, MDL_EXPLICIT, timeout))
+      DBUG_RETURN(1);
+
+    binlog_prot_acquired = true;
+  }
 
   /*
     We need a mutex while we are changing master info parameters to
@@ -1290,6 +1303,12 @@ end:
   if (!init_error && mi->rli->is_relay_log_recovery &&
       mi->rli->mts_recovery_group_cnt)
     init_error = fill_mts_gaps_and_recover(mi);
+
+  if (binlog_prot_acquired) {
+    DBUG_PRINT("debug", ("Releasing binlog protection lock"));
+    thd->backup_binlog_lock.release_protection(thd);
+  }
+
   DBUG_RETURN(init_error);
 }
 
@@ -6155,6 +6174,7 @@ bool mts_checkpoint_routine(Relay_log_info *rli, ulonglong period, bool force,
   bool error = false;
   struct timespec curr_clock;
   time_t ts = 0;
+  bool binlog_prot_acquired = false;
 
   DBUG_ENTER("checkpoint_routine");
 
@@ -6247,10 +6267,28 @@ bool mts_checkpoint_routine(Relay_log_info *rli, ulonglong period, bool force,
   std::sort(rli->least_occupied_workers.begin(),
             rli->least_occupied_workers.end());
 
-  if (need_data_lock)
+  if (need_data_lock) {
+    THD *const info_thd = rli->info_thd;
+    const ulong timeout = info_thd->variables.lock_wait_timeout;
+
+    /*
+      Acquire protection against global BINLOG lock before rli->data_lock is
+      locked (otherwise we would also block SHOW SLAVE STATUS).
+    */
+    DBUG_ASSERT(!info_thd->backup_binlog_lock.is_acquired());
+    DBUG_PRINT("debug", ("Acquiring binlog protection lock"));
+    mysql_mutex_assert_not_owner(&rli->data_lock);
+    error = info_thd->backup_binlog_lock.acquire_protection(
+        info_thd, MDL_EXPLICIT, timeout);
+    if (error) goto end;
+
+    binlog_prot_acquired = true;
+
     mysql_mutex_lock(&rli->data_lock);
-  else
+  } else {
     mysql_mutex_assert_owner(&rli->data_lock);
+    DBUG_ASSERT(rli->info_thd->backup_binlog_lock.is_protection_acquired());
+  }
 
   /*
     "Coordinator::commit_positions"
@@ -6305,6 +6343,12 @@ bool mts_checkpoint_routine(Relay_log_info *rli, ulonglong period, bool force,
   /* end-of "Coordinator::"commit_positions" */
 
 end:
+
+  if (binlog_prot_acquired) {
+    DBUG_PRINT("debug", ("Releasing binlog protection lock"));
+    rli->info_thd->backup_binlog_lock.release_protection(rli->info_thd);
+  }
+
   error = error || rli->info_thd->killed != THD::NOT_KILLED;
 #ifndef DBUG_OFF
   if (DBUG_EVALUATE_IF("check_slave_debug_group", 1, 0)) DBUG_SUICIDE();
@@ -9705,6 +9749,7 @@ int change_master(THD *thd, Master_info *mi, LEX_MASTER_INFO *lex_mi,
     options are not used.
   */
   bool need_relay_log_purge = 1;
+  bool binlog_prot_acquired = false;
 
   /*
     We want to save the old receive configurations so that we can use them to
@@ -10042,6 +10087,19 @@ int change_master(THD *thd, Master_info *mi, LEX_MASTER_INFO *lex_mi,
 
     relay_log_purge = save_relay_log_purge;
 
+    if (!thd->backup_binlog_lock.is_acquired()) {
+      const ulong timeout = thd->variables.lock_wait_timeout;
+
+      DBUG_PRINT("debug", ("Acquiring binlog protection lock"));
+      mysql_mutex_assert_not_owner(&mi->rli->data_lock);
+      if (thd->backup_binlog_lock.acquire_protection(thd, MDL_EXPLICIT,
+                                                     timeout)) {
+        goto err;
+      }
+
+      binlog_prot_acquired = true;
+    }
+
     /*
       Coordinates in rli were spoilt by the 'if (need_relay_log_purge)' block,
       so restore them to good values. If we left them to ''/0, that would work;
@@ -10100,6 +10158,10 @@ int change_master(THD *thd, Master_info *mi, LEX_MASTER_INFO *lex_mi,
       goto err;
     }
 err:
+  if (binlog_prot_acquired) {
+    DBUG_PRINT("debug", ("Releasing binlog protection lock"));
+    thd->backup_binlog_lock.release_protection(thd);
+  }
 
   unlock_slave_threads(mi);
   mi->channel_unlock();

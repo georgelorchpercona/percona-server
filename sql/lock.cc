@@ -1020,7 +1020,9 @@ bool Global_read_lock::lock_global_read_lock(THD *thd) {
       up with deadlocks being reported for queries previously blocked on a
       backup lock.
     */
-    if (thd->backup_tables_lock.abort_if_acquired()) DBUG_RETURN(true);
+    if (thd->backup_tables_lock.abort_if_acquired() ||
+        thd->backup_binlog_lock.abort_if_acquired())
+      DBUG_RETURN(true);
     MDL_REQUEST_INIT(&mdl_request, MDL_key::GLOBAL, "", "", MDL_SHARED,
                      MDL_EXPLICIT);
 
@@ -1174,6 +1176,30 @@ void Global_backup_lock::release(THD *thd) noexcept {
 }
 
 /**
+   Set explicit lock duration for the backup metadata lock.
+
+   @param thd     Reference to connection.
+*/
+
+void Global_backup_lock::set_explicit_locks_duration(THD *thd) {
+  DBUG_ENTER("Global_backup_lock::set_explicit_lock_duration");
+
+  if (m_lock) thd->mdl_context.set_lock_duration(m_lock, MDL_EXPLICIT);
+
+  DBUG_ASSERT((m_lock != NULL) == thd->mdl_context.owns_equal_or_stronger_lock(
+                                      m_namespace, "", "", MDL_SHARED));
+
+  if (m_prot_lock)
+    thd->mdl_context.set_lock_duration(m_prot_lock, MDL_EXPLICIT);
+
+  DBUG_ASSERT((m_prot_lock != NULL) ==
+              thd->mdl_context.owns_equal_or_stronger_lock(
+                  m_namespace, "", "", MDL_INTENTION_EXCLUSIVE));
+
+  DBUG_VOID_RETURN;
+}
+
+/**
    Acquire protection against a global backup lock. Wait if a global backup lock
    is active.
 
@@ -1201,6 +1227,8 @@ bool Global_backup_lock::acquire_protection(THD *thd,
   if (thd->mdl_context.acquire_lock(&mdl_request, lock_wait_timeout))
     DBUG_RETURN(true);
 
+  if (duration == MDL_EXPLICIT) m_prot_lock = mdl_request.ticket;
+
   DBUG_RETURN(false);
 }
 
@@ -1217,6 +1245,26 @@ void Global_backup_lock::init_protection_request(
 
   MDL_REQUEST_INIT(mdl_request, m_namespace, "", "", MDL_INTENTION_EXCLUSIVE,
                    duration);
+
+  DBUG_VOID_RETURN;
+}
+
+/**
+   Release a protection request against a global backup lock.
+
+   @param thd  Reference to connection.
+*/
+
+void Global_backup_lock::release_protection(THD *thd) {
+  DBUG_ENTER("Global_backup_lock::release_protection");
+
+  DBUG_ASSERT(m_prot_lock != NULL &&
+              thd->mdl_context.owns_equal_or_stronger_lock(
+                  m_namespace, "", "", MDL_INTENTION_EXCLUSIVE));
+
+  thd->mdl_context.release_lock(m_prot_lock);
+
+  m_prot_lock = NULL;
 
   DBUG_VOID_RETURN;
 }

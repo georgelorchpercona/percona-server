@@ -1129,10 +1129,25 @@ int Relay_log_info::inc_group_relay_log_pos(ulonglong log_pos,
   int error = 0;
   DBUG_ENTER("Relay_log_info::inc_group_relay_log_pos");
 
-  if (need_data_lock)
+  if (need_data_lock) {
+    const ulong timeout = info_thd->variables.lock_wait_timeout;
+
+    /*
+      Acquire protection against global BINLOG lock before rli->data_lock is
+      locked (otherwise we would also block SHOW SLAVE STATUS).
+    */
+    DBUG_ASSERT(!info_thd->backup_binlog_lock.is_acquired());
+    DBUG_PRINT("debug", ("Acquiring binlog protection lock"));
+    mysql_mutex_assert_not_owner(&data_lock);
+    if (info_thd->backup_binlog_lock.acquire_protection(info_thd, MDL_EXPLICIT,
+                                                        timeout))
+      DBUG_RETURN(1);
+
     mysql_mutex_lock(&data_lock);
-  else
+  } else {
     mysql_mutex_assert_owner(&data_lock);
+    DBUG_ASSERT(info_thd->backup_binlog_lock.is_protection_acquired());
+  }
 
   inc_event_relay_log_pos();
   group_relay_log_pos = event_relay_log_pos;
@@ -1192,7 +1207,13 @@ int Relay_log_info::inc_group_relay_log_pos(ulonglong log_pos,
   error = flush_info(force);
 
   mysql_cond_broadcast(&data_cond);
-  if (need_data_lock) mysql_mutex_unlock(&data_lock);
+  if (need_data_lock) {
+    mysql_mutex_unlock(&data_lock);
+
+    DBUG_PRINT("debug", ("Releasing binlog protection lock"));
+    info_thd->backup_binlog_lock.release_protection(info_thd);
+  }
+
   DBUG_RETURN(error);
 }
 
@@ -1254,6 +1275,7 @@ int Relay_log_info::purge_relay_logs(THD *thd, bool just_reset,
   mysql_mutex_t *log_lock = relay_log.get_log_lock();
 
   DBUG_ENTER("Relay_log_info::purge_relay_logs");
+  bool binlog_prot_acquired = false;
 
   /*
     Even if inited==0, we still try to empty master_log_* variables. Indeed,
@@ -1271,6 +1293,18 @@ int Relay_log_info::purge_relay_logs(THD *thd, bool just_reset,
     SLAVE, he will see old, confusing master_log_*. In other words, we reinit
     master_log_* for SHOW SLAVE STATUS to display fine in any case.
   */
+
+  if (!thd->backup_binlog_lock.is_acquired()) {
+    const ulong timeout = thd->variables.lock_wait_timeout;
+
+    DBUG_PRINT("debug", ("Acquiring binlog protection lock"));
+    mysql_mutex_assert_not_owner(&data_lock);
+    if (thd->backup_binlog_lock.acquire_protection(thd, MDL_EXPLICIT, timeout))
+      DBUG_RETURN(1);
+
+    binlog_prot_acquired = true;
+  }
+
   group_master_log_name[0] = 0;
   group_master_log_pos = 0;
 
@@ -1304,6 +1338,10 @@ int Relay_log_info::purge_relay_logs(THD *thd, bool just_reset,
         LogErr(ERROR_LEVEL, ER_SLAVE_RELAY_LOG_PURGE_FAILED,
                "Failed to open relay log index file:",
                relay_log.get_index_fname());
+        if (binlog_prot_acquired) {
+          DBUG_PRINT("debug", ("Releasing binlog protection lock"));
+          thd->backup_binlog_lock.release_protection(thd);
+        }
         DBUG_RETURN(1);
       }
       mysql_mutex_lock(&mi->data_lock);
@@ -1317,12 +1355,21 @@ int Relay_log_info::purge_relay_logs(THD *thd, bool just_reset,
         mysql_mutex_unlock(&mi->data_lock);
         LogErr(ERROR_LEVEL, ER_SLAVE_RELAY_LOG_PURGE_FAILED,
                "Failed to open relay log file:", relay_log.get_log_fname());
+        if (binlog_prot_acquired) {
+          DBUG_PRINT("debug", ("Releasing binlog protection lock"));
+          thd->backup_binlog_lock.release_protection(thd);
+        }
         DBUG_RETURN(1);
       }
       mysql_mutex_unlock(log_lock);
       mysql_mutex_unlock(&mi->data_lock);
-    } else
+    } else {
+      if (binlog_prot_acquired) {
+        DBUG_PRINT("debug", ("Releasing binlog protection lock"));
+        thd->backup_binlog_lock.release_protection(thd);
+      }
       DBUG_RETURN(0);
+    }
   } else {
     DBUG_ASSERT(slave_running == 0);
     DBUG_ASSERT(mi->slave_running == 0);
@@ -1382,6 +1429,12 @@ err:
 #endif
   DBUG_PRINT("info", ("log_space_total: %s", llstr(log_space_total, buf)));
   mysql_mutex_unlock(&data_lock);
+
+  if (binlog_prot_acquired) {
+    DBUG_PRINT("debug", ("Releasing binlog protection lock"));
+    thd->backup_binlog_lock.release_protection(thd);
+  }
+
   DBUG_RETURN(error);
 }
 

@@ -130,7 +130,8 @@ PSI_stage_info MDL_key::m_namespace_to_wait_state_name[NAMESPACE_END] = {
     {0, "Waiting for backup lock", 0, PSI_DOCUMENT_ME},
     {0, "Waiting for resource groups metadata lock", 0, PSI_DOCUMENT_ME},
     {0, "Waiting for foreign key metadata lock", 0, PSI_DOCUMENT_ME},
-    {0, "Waiting for table backup lock", 0, PSI_DOCUMENT_ME}};
+    {0, "Waiting for table backup lock", 0, PSI_DOCUMENT_ME},
+    {0, "Waiting for binlog lock", 0, PSI_DOCUMENT_ME}};
 
 #ifdef HAVE_PSI_INTERFACE
 void MDL_key::init_psi_keys() {
@@ -238,7 +239,8 @@ class MDL_map {
             mdl_key->mdl_namespace() == MDL_key::COMMIT ||
             mdl_key->mdl_namespace() == MDL_key::ACL_CACHE ||
             mdl_key->mdl_namespace() == MDL_key::BACKUP_LOCK ||
-            mdl_key->mdl_namespace() == MDL_key::BACKUP_TABLES);
+            mdl_key->mdl_namespace() == MDL_key::BACKUP_TABLES ||
+            mdl_key->mdl_namespace() == MDL_key::BACKUP_BINLOG);
   }
 
  private:
@@ -272,6 +274,8 @@ class MDL_map {
   std::atomic<int32> m_unused_lock_objects;
   /** Pre-allocated MDL_lock object for Percona BACKUP TABLES namespace. */
   MDL_lock *m_backup_tables_lock;
+  /** Pre-allocated MDL_lock object for Percona BACKUP_BINLOG namespace */
+  MDL_lock *m_backup_binlog_lock;
 };
 
 /**
@@ -1115,6 +1119,8 @@ void MDL_map::init() {
 
   const MDL_key percona_backup_lock_key(MDL_key::BACKUP_TABLES, "", "");
   m_backup_tables_lock = MDL_lock::create(&percona_backup_lock_key);
+  const MDL_key percona_backup_binlog_lock_key(MDL_key::BACKUP_BINLOG, "", "");
+  m_backup_binlog_lock = MDL_lock::create(&percona_backup_binlog_lock_key);
 
   m_unused_lock_objects = 0;
 
@@ -1130,6 +1136,7 @@ void MDL_map::init() {
 
 void MDL_map::destroy() {
   MDL_lock::destroy(m_backup_tables_lock);
+  MDL_lock::destroy(m_backup_binlog_lock);
   MDL_lock::destroy(m_global_lock);
   MDL_lock::destroy(m_commit_lock);
   MDL_lock::destroy(m_acl_cache_lock);
@@ -1184,6 +1191,9 @@ MDL_lock *MDL_map::find(LF_PINS *pins, const MDL_key *mdl_key, bool *pinned) {
         break;
       case MDL_key::BACKUP_TABLES:
         lock = m_backup_tables_lock;
+        break;
+      case MDL_key::BACKUP_BINLOG:
+        lock = m_backup_binlog_lock;
         break;
       default:
         DBUG_ASSERT(false);
@@ -1588,6 +1598,7 @@ inline void MDL_lock::reinit(const MDL_key *mdl_key) {
     case MDL_key::RESOURCE_GROUPS:
     case MDL_key::FOREIGN_KEY:
     case MDL_key::BACKUP_TABLES:
+    case MDL_key::BACKUP_BINLOG:
       m_strategy = &m_scoped_lock_strategy;
       break;
     default:
@@ -1625,6 +1636,7 @@ MDL_lock::fast_path_state_t MDL_lock::get_unobtrusive_lock_increment(
     case MDL_key::BACKUP_LOCK:
     case MDL_key::FOREIGN_KEY:
     case MDL_key::BACKUP_TABLES:
+    case MDL_key::BACKUP_BINLOG:
       return m_scoped_lock_strategy.m_unobtrusive_lock_increment[request->type];
     default:
       return m_object_lock_strategy.m_unobtrusive_lock_increment[request->type];

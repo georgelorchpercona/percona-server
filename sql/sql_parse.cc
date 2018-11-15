@@ -2465,6 +2465,30 @@ static bool lock_tables_for_backup(THD *thd) {
 }
 
 /**
+  Acquire a global binlog lock.
+
+  @param thd     Thread context.
+
+  @return FALSE in case of success, TRUE in case of error.
+*/
+
+bool lock_binlog_for_backup(THD *thd) {
+  DBUG_ENTER("lock_binlog_for_backup");
+
+  if (check_global_access(thd, RELOAD_ACL)) DBUG_RETURN(true);
+
+  /*
+    Do nothing if the current connection already owns a LOCK BINLOG FOR BACKUP
+    lock or the global read lock (as it's a more restrictive lock).
+  */
+  if (thd->backup_binlog_lock.is_acquired() ||
+      thd->global_read_lock.is_acquired())
+    DBUG_RETURN(false);
+
+  DBUG_RETURN(thd->backup_binlog_lock.acquire(thd));
+}
+
+/**
   This is a wrapper for MYSQL_BIN_LOG::gtid_end_transaction. For normal
   statements, the function gtid_end_transaction is called in the commit
   handler. However, if the statement is filtered out or not written to
@@ -3499,6 +3523,12 @@ int mysql_execute_command(THD *thd, bool first_level) {
       my_ok(thd);
       break;
 
+    case SQLCOM_UNLOCK_BINLOG:
+      if (thd->backup_binlog_lock.is_acquired())
+        thd->backup_binlog_lock.release(thd);
+      my_ok(thd);
+      break;
+
     case SQLCOM_LOCK_TABLES:
       /*
       Do not allow LOCK TABLES under an active LOCK TABLES FOR BACKUP in the
@@ -3551,6 +3581,12 @@ int mysql_execute_command(THD *thd, bool first_level) {
       if (!lock_tables_for_backup(thd)) my_ok(thd);
 
       break;
+
+    case SQLCOM_LOCK_BINLOG_FOR_BACKUP:
+      if (!lock_binlog_for_backup(thd)) my_ok(thd);
+
+      break;
+
     case SQLCOM_CREATE_COMPRESSION_DICTIONARY: {
       if (lex->create_info->zip_dict_name->fixed == 0)
         lex->create_info->zip_dict_name->fix_fields(thd, 0);

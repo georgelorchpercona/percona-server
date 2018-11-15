@@ -14633,7 +14633,11 @@ lock:
         ;
 
 lock_variant:
-        TABLES FOR_SYM BACKUP_SYM
+        BINLOG_SYM FOR_SYM BACKUP_SYM
+          {
+            Lex->sql_command= SQLCOM_LOCK_BINLOG_FOR_BACKUP;
+          }
+        | TABLES FOR_SYM BACKUP_SYM
           {
             Lex->sql_command= SQLCOM_LOCK_TABLES_FOR_BACKUP;
           }
@@ -14713,7 +14717,11 @@ unlock:
 	;
 
 unlock_variant:
-          INSTANCE_SYM
+          BINLOG_SYM
+          {
+            Lex->sql_command= SQLCOM_UNLOCK_BINLOG;
+          }
+        | INSTANCE_SYM
           {
             Lex->sql_command= SQLCOM_UNLOCK_INSTANCE;
             Lex->m_sql_cmd= NEW_PTN Sql_cmd_unlock_instance();

@@ -802,15 +802,18 @@ class Global_read_lock {
 class Global_backup_lock final {
  public:
   Global_backup_lock(MDL_key::enum_mdl_namespace mdl_namespace) noexcept
-      : m_namespace(mdl_namespace), m_lock(nullptr) {}
+      : m_namespace(mdl_namespace), m_lock(nullptr), m_prot_lock(nullptr) {}
 
   bool acquire(THD *thd);
   void release(THD *thd) noexcept;
+
+  void set_explicit_locks_duration(THD *thd);
 
   bool acquire_protection(THD *thd, enum_mdl_duration duration,
                           ulong lock_wait_timeout);
   void init_protection_request(MDL_request *mdl_request,
                                enum_mdl_duration duration) const;
+  void release_protection(THD *thd);
 
   /**
     Throw the ER_CANT_EXECUTE_WITH_BACKUP_LOCK error and return 'true', if the
@@ -828,9 +831,12 @@ class Global_backup_lock final {
 
   bool is_acquired() const noexcept { return m_lock != nullptr; }
 
+  bool is_protection_acquired() const { return m_prot_lock != nullptr; }
+
  private:
   const MDL_key::enum_mdl_namespace m_namespace;
   MDL_ticket *m_lock;
+  MDL_ticket *m_prot_lock;
 };
 
 extern "C" void my_message_sql(uint error, const char *str, myf MyFlags);
@@ -1950,6 +1956,8 @@ class THD : public MDL_context_owner,
   Global_read_lock global_read_lock;
 
   Global_backup_lock backup_tables_lock{MDL_key::BACKUP_TABLES};
+
+  Global_backup_lock backup_binlog_lock{MDL_key::BACKUP_BINLOG};
 
   Field *dup_field;
 

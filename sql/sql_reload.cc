@@ -185,7 +185,8 @@ bool handle_reload_request(THD *thd, unsigned long options, TABLE_LIST *tables,
               thd->mdl_context.has_locks(MDL_key::LOCKING_SERVICE) ||
               thd->mdl_context.has_locks(MDL_key::BACKUP_LOCK) ||
               thd->global_read_lock.is_acquired() ||
-              thd->backup_tables_lock.is_acquired());
+              thd->backup_tables_lock.is_acquired() ||
+              thd->backup_binlog_lock.is_acquired());
 
   /*
     Note that if REFRESH_READ_LOCK bit is set then REFRESH_TABLES is set too

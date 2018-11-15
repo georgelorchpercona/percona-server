@@ -16,8 +16,6 @@ SET GLOBAL general_log = ON
 root@localhost on  using Socket
 /*!40100 SET @@SQL_MODE='' */
 /*!40103 SET TIME_ZONE='+00:00' */
-/*!80000 SET SESSION information_schema_stats_expiry=0 */
-SET SESSION NET_READ_TIMEOUT= 700, SESSION NET_WRITE_TIMEOUT= 700
 FLUSH TABLES
 FLUSH TABLES WITH READ LOCK
 SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE table_schema = 'performance_schema' AND table_name = 'session_variables'
@@ -32,7 +30,7 @@ show table status like 't1'
 SET SQL_QUOTE_SHOW_CREATE=1
 SET SESSION character_set_results = 'binary'
 show create table `t1`
-SET SESSION character_set_results = 'utf8mb4'
+SET SESSION character_set_results = 'utf8'
 show fields from `t1`
 show fields from `t1`
 SELECT /*!40001 SQL_NO_CACHE */ * FROM `t1`
@@ -40,15 +38,12 @@ SET SESSION character_set_results = 'binary'
 use `test`
 select @@collation_database
 SHOW TRIGGERS LIKE 't1'
-SET SESSION character_set_results = 'utf8mb4'
-SET SESSION character_set_results = 'binary'
-SELECT COLUMN_NAME,                       JSON_EXTRACT(HISTOGRAM, '$."number-of-buckets-specified"')                FROM information_schema.COLUMN_STATISTICS                WHERE SCHEMA_NAME = 'test' AND TABLE_NAME = 't1'
-SET SESSION character_set_results = 'utf8mb4'
+SET SESSION character_set_results = 'utf8'
 show table status like 't2'
 SET SQL_QUOTE_SHOW_CREATE=1
 SET SESSION character_set_results = 'binary'
 show create table `t2`
-SET SESSION character_set_results = 'utf8mb4'
+SET SESSION character_set_results = 'utf8'
 show fields from `t2`
 show fields from `t2`
 SELECT /*!40001 SQL_NO_CACHE */ * FROM `t2`
@@ -56,10 +51,7 @@ SET SESSION character_set_results = 'binary'
 use `test`
 select @@collation_database
 SHOW TRIGGERS LIKE 't2'
-SET SESSION character_set_results = 'utf8mb4'
-SET SESSION character_set_results = 'binary'
-SELECT COLUMN_NAME,                       JSON_EXTRACT(HISTOGRAM, '$."number-of-buckets-specified"')                FROM information_schema.COLUMN_STATISTICS                WHERE SCHEMA_NAME = 'test' AND TABLE_NAME = 't2'
-SET SESSION character_set_results = 'utf8mb4'
+SET SESSION character_set_results = 'utf8'
 SELECT argument FROM mysql.general_log WHERE argument != ''
 TRUNCATE TABLE mysql.general_log;
 # Check that --lock-for-backup --single-transaction uses LOCK TABLES FOR
@@ -69,8 +61,6 @@ argument
 root@localhost on  using Socket
 /*!40100 SET @@SQL_MODE='' */
 /*!40103 SET TIME_ZONE='+00:00' */
-/*!80000 SET SESSION information_schema_stats_expiry=0 */
-SET SESSION NET_READ_TIMEOUT= 700, SESSION NET_WRITE_TIMEOUT= 700
 SHOW VARIABLES LIKE 'have_backup_locks'
 LOCK TABLES FOR BACKUP
 SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE table_schema = 'performance_schema' AND table_name = 'session_variables'
@@ -88,7 +78,7 @@ show table status like 't1'
 SET SQL_QUOTE_SHOW_CREATE=1
 SET SESSION character_set_results = 'binary'
 show create table `t1`
-SET SESSION character_set_results = 'utf8mb4'
+SET SESSION character_set_results = 'utf8'
 show fields from `t1`
 show fields from `t1`
 SELECT /*!40001 SQL_NO_CACHE */ * FROM `t1`
@@ -96,16 +86,13 @@ SET SESSION character_set_results = 'binary'
 use `test`
 select @@collation_database
 SHOW TRIGGERS LIKE 't1'
-SET SESSION character_set_results = 'utf8mb4'
-SET SESSION character_set_results = 'binary'
-SELECT COLUMN_NAME,                       JSON_EXTRACT(HISTOGRAM, '$."number-of-buckets-specified"')                FROM information_schema.COLUMN_STATISTICS                WHERE SCHEMA_NAME = 'test' AND TABLE_NAME = 't1'
-SET SESSION character_set_results = 'utf8mb4'
+SET SESSION character_set_results = 'utf8'
 ROLLBACK TO SAVEPOINT sp
 show table status like 't2'
 SET SQL_QUOTE_SHOW_CREATE=1
 SET SESSION character_set_results = 'binary'
 show create table `t2`
-SET SESSION character_set_results = 'utf8mb4'
+SET SESSION character_set_results = 'utf8'
 show fields from `t2`
 show fields from `t2`
 SELECT /*!40001 SQL_NO_CACHE */ * FROM `t2`
@@ -113,10 +100,7 @@ SET SESSION character_set_results = 'binary'
 use `test`
 select @@collation_database
 SHOW TRIGGERS LIKE 't2'
-SET SESSION character_set_results = 'utf8mb4'
-SET SESSION character_set_results = 'binary'
-SELECT COLUMN_NAME,                       JSON_EXTRACT(HISTOGRAM, '$."number-of-buckets-specified"')                FROM information_schema.COLUMN_STATISTICS                WHERE SCHEMA_NAME = 'test' AND TABLE_NAME = 't2'
-SET SESSION character_set_results = 'utf8mb4'
+SET SESSION character_set_results = 'utf8'
 ROLLBACK TO SAVEPOINT sp
 RELEASE SAVEPOINT sp
 SELECT argument FROM mysql.general_log WHERE argument != ''
@@ -127,8 +111,6 @@ argument
 root@localhost on  using Socket
 /*!40100 SET @@SQL_MODE='' */
 /*!40103 SET TIME_ZONE='+00:00' */
-/*!80000 SET SESSION information_schema_stats_expiry=0 */
-SET SESSION NET_READ_TIMEOUT= 700, SESSION NET_WRITE_TIMEOUT= 700
 SHOW VARIABLES LIKE 'have_backup_locks'
 SHOW STATUS LIKE 'binlog_snapshot_%'
 LOCK TABLES FOR BACKUP
@@ -149,7 +131,7 @@ show table status like 't1'
 SET SQL_QUOTE_SHOW_CREATE=1
 SET SESSION character_set_results = 'binary'
 show create table `t1`
-SET SESSION character_set_results = 'utf8mb4'
+SET SESSION character_set_results = 'utf8'
 show fields from `t1`
 show fields from `t1`
 SELECT /*!40001 SQL_NO_CACHE */ * FROM `t1`
@@ -157,16 +139,13 @@ SET SESSION character_set_results = 'binary'
 use `test`
 select @@collation_database
 SHOW TRIGGERS LIKE 't1'
-SET SESSION character_set_results = 'utf8mb4'
-SET SESSION character_set_results = 'binary'
-SELECT COLUMN_NAME,                       JSON_EXTRACT(HISTOGRAM, '$."number-of-buckets-specified"')                FROM information_schema.COLUMN_STATISTICS                WHERE SCHEMA_NAME = 'test' AND TABLE_NAME = 't1'
-SET SESSION character_set_results = 'utf8mb4'
+SET SESSION character_set_results = 'utf8'
 ROLLBACK TO SAVEPOINT sp
 show table status like 't2'
 SET SQL_QUOTE_SHOW_CREATE=1
 SET SESSION character_set_results = 'binary'
 show create table `t2`
-SET SESSION character_set_results = 'utf8mb4'
+SET SESSION character_set_results = 'utf8'
 show fields from `t2`
 show fields from `t2`
 SELECT /*!40001 SQL_NO_CACHE */ * FROM `t2`
@@ -174,10 +153,7 @@ SET SESSION character_set_results = 'binary'
 use `test`
 select @@collation_database
 SHOW TRIGGERS LIKE 't2'
-SET SESSION character_set_results = 'utf8mb4'
-SET SESSION character_set_results = 'binary'
-SELECT COLUMN_NAME,                       JSON_EXTRACT(HISTOGRAM, '$."number-of-buckets-specified"')                FROM information_schema.COLUMN_STATISTICS                WHERE SCHEMA_NAME = 'test' AND TABLE_NAME = 't2'
-SET SESSION character_set_results = 'utf8mb4'
+SET SESSION character_set_results = 'utf8'
 ROLLBACK TO SAVEPOINT sp
 RELEASE SAVEPOINT sp
 SELECT argument FROM mysql.general_log WHERE argument != ''

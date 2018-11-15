@@ -1,5 +1,5 @@
 ########################################################################
-# Tests for LOCK TABLES FOR BACKUP 
+# Tests for LOCK TABLES FOR BACKUP and LOCK BINLOG FOR BACKUP
 ########################################################################
 
 --source include/have_myisam.inc
@@ -39,9 +39,18 @@ LOCK TABLES t_innodb FOR BACKUP;
 LOCK TABLES t_innodb READ FOR BACKUP;
 --error ER_PARSE_ERROR
 LOCK TABLES t_innodb FOR BACKUP READ;
+--error ER_PARSE_ERROR
+LOCK BINLOG t_innodb FOR BACKUP;
+--error ER_PARSE_ERROR
+LOCK BINLOG t_innodb READ FOR BACKUP;
+--error ER_PARSE_ERROR
+LOCK BINLOG t_innodb FOR BACKUP READ;
 
 LOCK TABLES FOR BACKUP;
 UNLOCK TABLES;
+
+LOCK BINLOG FOR BACKUP;
+UNLOCK BINLOG;
 
 --echo #-----------------------------------------------------------------------
 --echo # No backup locks are allowed in stored routines
@@ -55,9 +64,22 @@ BEGIN
 END|
 
 --error ER_SP_BADSTATEMENT
+CREATE PROCEDURE p2()
+BEGIN
+  LOCK BINLOG FOR BACKUP;
+END|
+
+--error ER_SP_BADSTATEMENT
 CREATE FUNCTION f1() RETURNS INT DETERMINISTIC
 BEGIN
   LOCK TABLES FOR BACKUP;
+  RETURN 1;
+END|
+
+--error ER_SP_BADSTATEMENT
+CREATE FUNCTION f2() RETURNS INT DETERMINISTIC
+BEGIN
+  LOCK BINLOG FOR BACKUP;
   RETURN 1;
 END|
 
@@ -80,6 +102,17 @@ SHOW STATUS LIKE 'Com_lock_tables_for_backup';
 
 UNLOCK TABLES;
 SHOW STATUS LIKE 'Com_unlock_tables';
+
+#
+# Multiple BFB locks in the same connection
+#
+LOCK BINLOG FOR BACKUP;
+LOCK BINLOG FOR BACKUP;
+
+SHOW STATUS LIKE 'Com_lock_binlog_for_backup';
+
+UNLOCK BINLOG;
+SHOW STATUS LIKE 'Com_unlock_binlog';
 
 #
 # LTFB + DDL / DML in the same connection
@@ -263,6 +296,137 @@ INSERT INTO v_archive VALUES(1);
 UNLOCK TABLES;
 
 #
+# LBFB + DML/DDL in the same connection (and binlog disabled)
+#
+
+LOCK BINLOG FOR BACKUP;
+
+DELETE FROM t_innodb;
+INSERT INTO t_innodb VALUES(0);
+UPDATE t_innodb SET a = 1;
+REPLACE INTO t_innodb VALUES(1);
+SELECT * from t_innodb;
+HANDLER t_innodb OPEN;
+HANDLER t_innodb READ a FIRST;
+HANDLER t_innodb CLOSE;
+
+DELETE FROM t_myisam;
+INSERT INTO t_myisam VALUES(0);
+UPDATE t_myisam SET a = 1;
+REPLACE INTO t_myisam VALUES(1);
+SELECT * from t_myisam;
+HANDLER t_myisam OPEN;
+HANDLER t_myisam READ a FIRST;
+HANDLER t_myisam CLOSE;
+
+DELETE FROM t_memory;
+INSERT INTO t_memory VALUES(0);
+UPDATE t_memory SET a = 1;
+REPLACE INTO t_memory VALUES(1);
+SELECT * from t_memory;
+
+DELETE FROM t_archive;
+INSERT INTO t_archive VALUES(0);
+SELECT * from t_archive;
+
+DELETE FROM t_csv;
+INSERT INTO t_csv VALUES(0);
+UPDATE t_csv SET a = 1;
+REPLACE INTO t_csv VALUES(1);
+SELECT * from t_csv;
+
+DELETE FROM t_blackhole;
+INSERT INTO t_blackhole VALUES(0);
+UPDATE t_blackhole SET a = 1;
+REPLACE INTO t_blackhole VALUES(1);
+SELECT * from t_blackhole;
+
+CREATE TABLE tt_innodb(a INT NOT NULL) ENGINE=InnoDB;
+CREATE TABLE tt_myisam(a INT NOT NULL) ENGINE=MyISAM;
+CREATE TABLE tt_memory(a INT NOT NULL) ENGINE=MEMORY;
+CREATE TABLE tt_csv(a INT NOT NULL) ENGINE=CSV;
+CREATE TABLE tt_blackhole(a INT NOT NULL) ENGINE=BLACKHOLE;
+CREATE TABLE tt_archive(a INT NOT NULL) ENGINE=ARCHIVE;
+
+DROP TABLE tt_innodb;
+DROP TABLE tt_myisam;
+DROP TABLE tt_memory;
+DROP TABLE tt_csv;
+DROP TABLE tt_blackhole;
+DROP TABLE tt_archive;
+
+--error ER_BAD_TABLE_ERROR
+DROP TABLE non_existing;
+
+TRUNCATE TABLE t_innodb;
+TRUNCATE TABLE t_myisam;
+TRUNCATE TABLE t_memory;
+TRUNCATE TABLE t_csv;
+TRUNCATE TABLE t_blackhole;
+
+RENAME TABLE t_innodb TO tmp, tmp TO t_innodb;
+RENAME TABLE t_myisam TO tmp, tmp TO t_myisam;
+RENAME TABLE t_memory TO tmp, tmp TO t_memory;
+RENAME TABLE t_csv TO tmp, tmp TO t_csv;
+RENAME TABLE t_blackhole TO tmp, tmp TO t_blackhole;
+RENAME TABLE t_archive TO tmp, tmp TO t_archive;
+
+ALTER TABLE t_innodb ADD COLUMN b CHAR(10) NOT NULL;
+ALTER TABLE t_innodb DROP COLUMN b;
+ALTER TABLE t_myisam ADD COLUMN b CHAR(10) NOT NULL;
+ALTER TABLE t_myisam DROP COLUMN b;
+ALTER TABLE t_memory ADD COLUMN b CHAR(10) NOT NULL;
+ALTER TABLE t_memory DROP COLUMN b;
+ALTER TABLE t_csv ADD COLUMN b CHAR(10) NOT NULL;
+ALTER TABLE t_csv DROP COLUMN b;
+ALTER TABLE t_blackhole ADD COLUMN b CHAR(10) NOT NULL;
+ALTER TABLE t_blackhole DROP COLUMN b;
+ALTER TABLE t_archive ADD COLUMN b CHAR(10) NOT NULL;
+ALTER TABLE t_archive DROP COLUMN b;
+
+ALTER TABLE t_innodb ADD KEY tmp (a);
+ALTER TABLE t_innodb DROP KEY tmp;
+ALTER TABLE t_myisam ADD KEY tmp (a);
+ALTER TABLE t_myisam DROP KEY tmp;
+ALTER TABLE t_memory ADD KEY tmp (a);
+ALTER TABLE t_memory DROP KEY tmp;
+ALTER TABLE t_blackhole ADD KEY tmp (a);
+ALTER TABLE t_blackhole DROP KEY tmp;
+
+CREATE DATABASE test1;
+DROP DATABASE test1;
+
+delimiter |;
+
+CREATE PROCEDURE p1()
+BEGIN
+  SELECT 1;
+END|
+
+DROP PROCEDURE p1|
+
+CREATE FUNCTION f1() RETURNS INT DETERMINISTIC
+BEGIN
+  RETURN 1;
+END|
+
+DROP FUNCTION f1|
+
+delimiter ;|
+
+CREATE VIEW v1 AS SELECT * FROM t_innodb;
+DROP VIEW v1;
+
+INSERT INTO v_innodb VALUES(1);
+INSERT INTO v_blackhole VALUES(1);
+INSERT INTO v_myisam VALUES(1);
+INSERT INTO v_csv VALUES(1);
+INSERT INTO v_memory VALUES(1);
+INSERT INTO v_archive VALUES(1);
+
+UNLOCK BINLOG;
+
+#
 # Test incompatibility with delay_key_write=ALL
 #
 SELECT @@delay_key_write;
@@ -314,7 +478,50 @@ INSERT INTO tt_csv VALUES(5);
 INSERT INTO tt_blackhole VALUES(5);
 INSERT INTO tt_archive VALUES(5);
 
+LOCK BINLOG FOR BACKUP;
+
+START TRANSACTION;
+SELECT * FROM tt_archive;
+SELECT * FROM tt_blackhole;
+SELECT * FROM tt_memory;
+SELECT * FROM tt_innodb;
+SELECT * FROM tt_myisam;
+INSERT INTO tt_innodb VALUES(6);
+INSERT INTO tt_myisam VALUES(6);
+INSERT INTO tt_memory VALUES(6);
+INSERT INTO tt_csv VALUES(6);
+INSERT INTO tt_blackhole VALUES(6);
+INSERT INTO tt_archive VALUES(6);
+COMMIT;
+
+SELECT * FROM tt_archive;
+SELECT * FROM tt_blackhole;
+SELECT * FROM tt_memory;
+SELECT * FROM tt_innodb;
+SELECT * FROM tt_myisam;
+
+DROP TEMPORARY TABLE tt_innodb;
+DROP TEMPORARY TABLE tt_myisam;
+DROP TEMPORARY TABLE tt_memory;
+DROP TEMPORARY TABLE tt_csv;
+DROP TEMPORARY TABLE tt_blackhole;
+DROP TEMPORARY TABLE tt_archive;
+
+UNLOCK BINLOG;
 UNLOCK TABLES;
+
+#
+# test that AUTOCOMMIT updates succeed with a BINLOG lock in the same connection with binlog disabled
+#
+
+SELECT @@log_bin;
+
+LOCK BINLOG FOR BACKUP;
+
+INSERT INTO t_innodb VALUES(1);
+INSERT INTO t_myisam VALUES(1);
+
+UNLOCK BINLOG;
 
 #
 # Log tables
@@ -333,6 +540,12 @@ SET GLOBAL slow_query_log = ON;
 LOCK TABLES FOR BACKUP;
 
 SELECT 1;
+
+LOCK BINLOG FOR BACKUP;
+
+SELECT 1;
+
+UNLOCK BINLOG;
 
 UNLOCK TABLES;
 
@@ -475,7 +688,65 @@ INSERT INTO tt_csv VALUES(5);
 INSERT INTO tt_blackhole VALUES(5);
 INSERT INTO tt_archive VALUES(5);
 
+--connection default
+--echo # connection default
+LOCK BINLOG FOR BACKUP;
+
+--connection con1
+--echo # connection con1
+
+START TRANSACTION;
+SELECT * FROM tt_archive;
+SELECT * FROM tt_blackhole;
+SELECT * FROM tt_memory;
+SELECT * FROM tt_innodb;
+SELECT * FROM tt_myisam;
+INSERT INTO tt_innodb VALUES(6);
+INSERT INTO tt_myisam VALUES(6);
+INSERT INTO tt_memory VALUES(6);
+INSERT INTO tt_csv VALUES(6);
+INSERT INTO tt_blackhole VALUES(6);
+INSERT INTO tt_archive VALUES(6);
+COMMIT;
+
+SELECT * FROM tt_archive;
+SELECT * FROM tt_blackhole;
+SELECT * FROM tt_memory;
+SELECT * FROM tt_innodb;
+SELECT * FROM tt_myisam;
+
+DROP TEMPORARY TABLE tt_innodb;
+DROP TEMPORARY TABLE tt_myisam;
+DROP TEMPORARY TABLE tt_memory;
+DROP TEMPORARY TABLE tt_csv;
+DROP TEMPORARY TABLE tt_blackhole;
+DROP TEMPORARY TABLE tt_archive;
+
+--connection default
+--echo # connection default
+
+UNLOCK BINLOG;
 UNLOCK TABLES;
+
+LOCK BINLOG FOR BACKUP;
+
+--connection con1
+--echo # connection con1
+
+#
+# test that AUTOCOMMIT updates are not blocked with a BINLOG lock in another
+# connection with binlog disabled
+#
+
+SELECT @@log_bin;
+
+INSERT INTO t_innodb VALUES(1);
+INSERT INTO t_myisam VALUES(1);
+
+--connection default
+--echo # connection default
+
+UNLOCK BINLOG;
 
 #
 # LTFB + DDL / DML in another connection
@@ -612,6 +883,142 @@ INSERT INTO v_myisam VALUES(1);
 UNLOCK TABLES;
 
 #
+# LBFB + DML/DDL in another connection (and binlog disabled)
+#
+
+LOCK BINLOG FOR BACKUP;
+
+--connection con1
+--echo # connection con1
+
+DELETE FROM t_innodb;
+INSERT INTO t_innodb VALUES(0);
+UPDATE t_innodb SET a = 1;
+REPLACE INTO t_innodb VALUES(1);
+SELECT * from t_innodb;
+HANDLER t_innodb OPEN;
+HANDLER t_innodb READ a FIRST;
+HANDLER t_innodb CLOSE;
+
+DELETE FROM t_myisam;
+INSERT INTO t_myisam VALUES(0);
+UPDATE t_myisam SET a = 1;
+REPLACE INTO t_myisam VALUES(1);
+SELECT * from t_myisam;
+HANDLER t_myisam OPEN;
+HANDLER t_myisam READ a FIRST;
+HANDLER t_myisam CLOSE;
+
+DELETE FROM t_memory;
+INSERT INTO t_memory VALUES(0);
+UPDATE t_memory SET a = 1;
+REPLACE INTO t_memory VALUES(1);
+SELECT * from t_memory;
+
+INSERT INTO t_archive VALUES(0);
+SELECT * from t_archive;
+
+DELETE FROM t_csv;
+INSERT INTO t_csv VALUES(0);
+UPDATE t_csv SET a = 1;
+REPLACE INTO t_csv VALUES(1);
+SELECT * from t_csv;
+
+DELETE FROM t_blackhole;
+INSERT INTO t_blackhole VALUES(0);
+UPDATE t_blackhole SET a = 1;
+REPLACE INTO t_blackhole VALUES(1);
+SELECT * from t_blackhole;
+
+CREATE TABLE tt_innodb(a INT NOT NULL) ENGINE=InnoDB;
+CREATE TABLE tt_myisam(a INT NOT NULL) ENGINE=MyISAM;
+CREATE TABLE tt_memory(a INT NOT NULL) ENGINE=MEMORY;
+CREATE TABLE tt_csv(a INT NOT NULL) ENGINE=CSV;
+CREATE TABLE tt_blackhole(a INT NOT NULL) ENGINE=BLACKHOLE;
+CREATE TABLE tt_archive(a INT NOT NULL) ENGINE=ARCHIVE;
+
+DROP TABLE tt_innodb;
+DROP TABLE tt_myisam;
+DROP TABLE tt_memory;
+DROP TABLE tt_csv;
+DROP TABLE tt_blackhole;
+DROP TABLE tt_archive;
+
+--error ER_BAD_TABLE_ERROR
+DROP TABLE non_existing;
+
+TRUNCATE TABLE t_innodb;
+TRUNCATE TABLE t_myisam;
+TRUNCATE TABLE t_memory;
+TRUNCATE TABLE t_csv;
+TRUNCATE TABLE t_blackhole;
+
+RENAME TABLE t_innodb TO tmp, tmp TO t_innodb;
+RENAME TABLE t_myisam TO tmp, tmp TO t_myisam;
+RENAME TABLE t_memory TO tmp, tmp TO t_memory;
+RENAME TABLE t_csv TO tmp, tmp TO t_csv;
+RENAME TABLE t_blackhole TO tmp, tmp TO t_blackhole;
+RENAME TABLE t_archive TO tmp, tmp TO t_archive;
+
+ALTER TABLE t_innodb ADD COLUMN b CHAR(10) NOT NULL;
+ALTER TABLE t_innodb DROP COLUMN b;
+ALTER TABLE t_myisam ADD COLUMN b CHAR(10) NOT NULL;
+ALTER TABLE t_myisam DROP COLUMN b;
+ALTER TABLE t_memory ADD COLUMN b CHAR(10) NOT NULL;
+ALTER TABLE t_memory DROP COLUMN b;
+ALTER TABLE t_csv ADD COLUMN b CHAR(10) NOT NULL;
+ALTER TABLE t_csv DROP COLUMN b;
+ALTER TABLE t_blackhole ADD COLUMN b CHAR(10) NOT NULL;
+ALTER TABLE t_blackhole DROP COLUMN b;
+ALTER TABLE t_archive ADD COLUMN b CHAR(10) NOT NULL;
+ALTER TABLE t_archive DROP COLUMN b;
+
+ALTER TABLE t_innodb ADD KEY tmp (a);
+ALTER TABLE t_innodb DROP KEY tmp;
+ALTER TABLE t_myisam ADD KEY tmp (a);
+ALTER TABLE t_myisam DROP KEY tmp;
+ALTER TABLE t_memory ADD KEY tmp (a);
+ALTER TABLE t_memory DROP KEY tmp;
+ALTER TABLE t_blackhole ADD KEY tmp (a);
+ALTER TABLE t_blackhole DROP KEY tmp;
+
+CREATE DATABASE test1;
+DROP DATABASE test1;
+
+delimiter |;
+
+CREATE PROCEDURE p1()
+BEGIN
+  SELECT 1;
+END|
+
+DROP PROCEDURE p1|
+
+CREATE FUNCTION f1() RETURNS INT DETERMINISTIC
+BEGIN
+  RETURN 1;
+END|
+
+DROP FUNCTION f1|
+
+delimiter ;|
+
+CREATE VIEW v1 AS SELECT * FROM t_innodb;
+DROP VIEW v1;
+
+INSERT INTO v_innodb VALUES(1);
+INSERT INTO v_blackhole VALUES(1);
+INSERT INTO v_myisam VALUES(1);
+INSERT INTO v_csv VALUES(1);
+INSERT INTO v_memory VALUES(1);
+INSERT INTO v_archive VALUES(1);
+
+--connection default
+--echo # connection default
+
+UNLOCK BINLOG;
+
+#
 # Log tables
 #
 
@@ -632,6 +1039,23 @@ SET @old_long_query_time = @@SESSION.long_query_time;
 SET SESSION long_query_time = 0;
 
 SELECT 1;
+
+--connection default
+--echo # connection default
+
+LOCK BINLOG FOR BACKUP;
+
+SELECT 1;
+
+--connection con1
+--echo # connection con1
+
+SET SESSION long_query_time = @old_long_query_time;
+
+--connection default
+--echo # connection default
+
+UNLOCK BINLOG;
 
 UNLOCK TABLES;
 
@@ -691,6 +1115,43 @@ FLUSH TABLES WITH READ LOCK;
 UNLOCK TABLES;
 
 DROP TABLE t1;
+
+################################################################################
+# Bug #1371827: Sporadic partial-hangup on various queries + related
+#               (same-testcase) crashes/asserts
+################################################################################
+
+CREATE TABLE t(a int) ENGINE=InnoDB;
+
+FLUSH TABLES t FOR EXPORT;
+
+LOCK BINLOG FOR BACKUP;
+
+UNLOCK TABLES;
+
+UNLOCK BINLOG;
+
+DROP TABLE t;
+
+################################################################################
+# Bug #1377093: Assertion `m_lock != __null &&
+#               thd->mdl_context.is_lock_owner(m_namespace, "", "", MDL_SHARED)'
+#               failed. in lock.cc:1140 | abort (sig=6) in
+#               Global_backup_lock::release
+################################################################################
+
+--connect(con,localhost,root,,)
+
+CREATE TABLE t(a INT);
+
+LOCK TABLE t READ;
+
+LOCK BINLOG FOR BACKUP;
+
+--disconnect con
+--connection default
+
+DROP TABLE t;
 
 --echo #-----------------------------------------------------------------------
 --echo # Cleanup

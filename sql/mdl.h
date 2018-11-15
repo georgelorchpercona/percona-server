@@ -392,6 +392,7 @@ struct MDL_key {
     RESOURCE_GROUPS,
     FOREIGN_KEY,
     BACKUP_TABLES, /* Percona LOCK TABLES FOR BACKUP */
+    BACKUP_BINLOG, /* Percona LOCK BINLOG FOR BACKUP */
     /* This should be the last ! */
     NAMESPACE_END
   };

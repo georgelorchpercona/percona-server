@@ -6214,6 +6214,20 @@ int Rotate_log_event::do_update_pos(Relay_log_info *rli) {
         goto err;
     }
 
+    /*
+      Acquire protection against global BINLOG lock before rli->data_lock is
+      locked (otherwise we would also block SHOW SLAVE STATUS).
+    */
+    DBUG_ASSERT(!thd->backup_binlog_lock.is_acquired());
+    DBUG_PRINT("debug", ("Acquiring binlog protection lock"));
+    mysql_mutex_assert_not_owner(&rli->data_lock);
+    const ulong timeout = thd->variables.lock_wait_timeout;
+    if (thd->backup_binlog_lock.acquire_protection(thd, MDL_EXPLICIT,
+                                                   timeout)) {
+      error = 1;
+      goto err;
+    }
+
     mysql_mutex_lock(&rli->data_lock);
     DBUG_PRINT("info", ("old group_master_log_name: '%s'  "
                         "old group_master_log_pos: %lu",
@@ -6235,6 +6249,8 @@ int Rotate_log_event::do_update_pos(Relay_log_info *rli) {
     if ((error = rli->inc_group_relay_log_pos(
              pos, false /* need_data_lock=false */, true /* force flush */))) {
       mysql_mutex_unlock(&rli->data_lock);
+      DBUG_PRINT("debug", ("Releasing binlog protection lock"));
+      thd->backup_binlog_lock.release_protection(thd);
       goto err;
     }
 
@@ -6243,6 +6259,9 @@ int Rotate_log_event::do_update_pos(Relay_log_info *rli) {
                         rli->get_group_master_log_name(),
                         (ulong)rli->get_group_master_log_pos()));
     mysql_mutex_unlock(&rli->data_lock);
+
+    DBUG_PRINT("debug", ("Releasing binlog protection lock"));
+    thd->backup_binlog_lock.release_protection(thd);
 
     if (rli->is_parallel_exec()) {
       bool real_event = server_id && !is_artificial_event();
@@ -6720,6 +6739,18 @@ int Xid_apply_log_event::do_apply_event(Relay_log_info const *rli) {
   /* For a slave Xid_log_event is COMMIT */
   query_logger.general_log_print(thd, COM_QUERY,
                                  "COMMIT /* implicit, from Xid_log_event */");
+  bool binlog_prot_acquired = false;
+
+  if (!thd->backup_binlog_lock.is_acquired()) {
+    const ulong timeout = thd->variables.lock_wait_timeout;
+
+    DBUG_PRINT("debug", ("Acquiring binlog protection lock"));
+    mysql_mutex_assert_not_owner(&rli->data_lock);
+    if (thd->backup_binlog_lock.acquire_protection(thd, MDL_EXPLICIT, timeout))
+      DBUG_RETURN(1);
+
+    binlog_prot_acquired = true;
+  }
 
   mysql_mutex_lock(&rli_ptr->data_lock);
 
@@ -6858,6 +6889,11 @@ err:
     rli_ptr->is_group_master_log_pos_invalid = false;
   mysql_cond_broadcast(&rli_ptr->data_cond);
   mysql_mutex_unlock(&rli_ptr->data_lock);
+
+  if (binlog_prot_acquired) {
+    DBUG_PRINT("debug", ("Releasing binlog protection lock"));
+    thd->backup_binlog_lock.release_protection(thd);
+  }
 
   DBUG_RETURN(error);
 }

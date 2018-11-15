@@ -392,6 +392,7 @@ inline bool connection_is_high_prio(const connection_t &c) noexcept {
            c.thd->mdl_context.has_locks() ||
            c.thd->global_read_lock.is_acquired() ||
            c.thd->backup_tables_lock.is_acquired() ||
+           c.thd->backup_binlog_lock.is_acquired() ||
            c.thd->mdl_context.has_locks(MDL_key::USER_LEVEL_LOCK) ||
            c.thd->mdl_context.has_locks(MDL_key::LOCKING_SERVICE)));
 }
