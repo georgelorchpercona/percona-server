@@ -278,7 +278,7 @@ bool trans_commit(THD *thd, bool ignore_global_read_lock) {
 
   trans_track_end_trx(thd);
 
-  thd->dd_client()->commit_modified_objects();
+  if (!res) thd->dd_client()->commit_modified_objects();
   thd->locked_tables_list.adjust_renamed_tablespace_mdls(&thd->mdl_context);
 
   DBUG_RETURN(res);
@@ -348,7 +348,7 @@ bool trans_commit_implicit(THD *thd, bool ignore_global_read_lock) {
 
   trans_track_end_trx(thd);
 
-  thd->dd_client()->commit_modified_objects();
+  if (!res) thd->dd_client()->commit_modified_objects();
   thd->locked_tables_list.adjust_renamed_tablespace_mdls(&thd->mdl_context);
   DBUG_RETURN(ha_commit_res || tc_log_commit_res != TC_LOG::RESULT_SUCCESS);
 }

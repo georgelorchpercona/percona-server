@@ -1,0 +1,23 @@
+#
+# Bug 93196 fix. If bug is not fixed there will be crash on DROP DATABASE/TABLE
+# under debug build when binlog commit failure is simulated.
+#
+--source include/have_debug.inc
+
+SET @debug_save= @@GLOBAL.DEBUG;
+
+CREATE DATABASE test1;
+SET @@GLOBAL.DEBUG= '+d,simulate_failure_in_before_commit_hook';
+--error ER_RUN_HOOK_ERROR
+# Crash if the bug is not fixed
+DROP DATABASE test1;
+SET @@GLOBAL.DEBUG= @debug_save;
+DROP DATABASE test1;
+
+CREATE TABLE t1(a INT NOT NULL);
+SET @@GLOBAL.DEBUG= '+d,simulate_failure_in_before_commit_hook';
+--error ER_RUN_HOOK_ERROR
+# Crash if the bug is not fixed
+DROP TABLE t1;
+SET @@GLOBAL.DEBUG= @debug_save;
+DROP table t1;
