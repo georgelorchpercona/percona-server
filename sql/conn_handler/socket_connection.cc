@@ -735,7 +735,7 @@ Mysqld_socket_listener::Mysqld_socket_listener(
 #ifdef HAVE_LIBWRAP
   m_deny_severity = LOG_WARNING;
   m_libwrap_name = my_progname + dirname_length(my_progname);
-  if (!opt_log_syslog_enable) openlog(m_libwrap_name, LOG_PID, LOG_AUTH);
+  if (!log_syslog_enable) openlog(m_libwrap_name, LOG_PID, LOG_AUTH);
 #endif /* HAVE_LIBWRAP */
 }
 
