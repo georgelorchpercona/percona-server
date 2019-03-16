@@ -33,6 +33,7 @@
 #include "rocksdb/merge_operator.h"
 #include "rocksdb/slice_transform.h"
 #include "rocksdb/utilities/transaction_db.h"
+#include "rocksdb/cloud/db_cloud.h"
 
 /* MyRocks header files */
 #include "./ha_rocksdb.h"
