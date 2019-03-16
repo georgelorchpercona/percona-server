@@ -64,6 +64,9 @@
 #include "rocksdb/utilities/write_batch_with_index.h"
 #include "util/stop_watch.h"
 
+#include "rocksdb/cloud/db_cloud.h"
+#include "rocksdb/cloud/cloud_env_options.h"
+
 /* MyRocks includes */
 #include "./event_listener.h"
 #include "./ha_rocksdb_proto.h"
@@ -509,6 +512,249 @@ static my_bool rocksdb_no_create_column_family = FALSE;
 static uint32_t rocksdb_debug_manual_compaction_delay = 0;
 static uint32_t rocksdb_max_manual_compactions = 0;
 
+static char* rocksdb_cloud_bucket_keyid = nullptr;
+static char* rocksdb_cloud_bucket_secret = nullptr;
+static char* rocksdb_cloud_bucket_region = nullptr;
+static char* rocksdb_cloud_bucket_suffix = nullptr;
+static uint64_t rocksdb_cloud_persistent_cache_size_gb = 0;
+static my_bool rocksdb_cloud_keep_local_sst_files = FALSE;
+static my_bool rocksdb_cloud_keep_local_log_files = FALSE;
+static uint rocksdb_cloud_log_type = 0;
+static char* rocksdb_cloud_kafka_metadata_broker_list = nullptr;
+static uint64_t rocksdb_cloud_kafka_message_max_bytes = 0;
+static uint64_t rocksdb_cloud_kafka_message_copy_max_bytes = 0;
+static uint64_t rocksdb_cloud_kafka_fetch_message_max_bytes = 0;
+static uint64_t rocksdb_cloud_kafka_receive_message_max_bytes = 0;
+static uint64_t rocksdb_cloud_request_timeout_ms = 0;
+static char* rocksdb_cloud_clone_datadir = 0;
+
+// AWS related
+
+// General SDK options: logging
+static int rocksdb_cloud_aws_log_level = 0; // see https://sdk.amazonaws.com/cpp/api/0.14.3/aws-cpp-sdk-core_2include_2aws_2core_2utils_2logging_2_log_level_8h_source.html
+
+// timeout control
+static long int rocksdb_cloud_aws_request_timeout_ms = 0;
+static long int rocksdb_cloud_aws_connect_timeout_ms = 0;
+
+// endpoint
+static char* rocksdb_cloud_aws_endpoint_override = nullptr;
+static char* rocksdb_cloud_aws_scheme = nullptr;
+static int rocksdb_cloud_aws_verify_ssl = 0;
+
+// proxy support
+static char* rocksdb_cloud_aws_proxy_scheme = nullptr;
+static char* rocksdb_cloud_aws_proxy_host = nullptr;
+static int rocksdb_cloud_aws_proxy_port = 0;
+static char* rocksdb_cloud_aws_proxy_user_name = nullptr;
+static char* rocksdb_cloud_aws_proxy_password = nullptr;
+
+static MYSQL_SYSVAR_STR(cloud_clone_datadir, rocksdb_cloud_clone_datadir,
+                          PLUGIN_VAR_OPCMDARG | PLUGIN_VAR_READONLY,
+                          "RocksDB Cloud clone data directory. If null no "
+                          "clone used, otherwise will create/open clone from "
+                          "rocksdb_datadir",
+                          nullptr, nullptr, nullptr);
+
+static MYSQL_SYSVAR_ULONG(cloud_persistent_cache_size_gb,
+                          rocksdb_cloud_persistent_cache_size_gb,
+                          PLUGIN_VAR_OPCMDARG | PLUGIN_VAR_READONLY,
+                          "Size of local read cache in GB", nullptr, nullptr,
+                          0L,
+                          /* min */ 0L, /* max */ ULONG_MAX, 0);
+
+static MYSQL_SYSVAR_ULONG(cloud_kafka_message_max_bytes,
+                          rocksdb_cloud_kafka_message_max_bytes,
+                          PLUGIN_VAR_OPCMDARG | PLUGIN_VAR_READONLY,
+                          "Maximum Kafka protocol request message size. See "
+                          "https://github.com/edenhill/librdkafka/blob/master/"
+                          "CONFIGURATION.md for details",
+                          nullptr, nullptr, 10L * 1024L * 1024L,
+                          /* min */ 0L, /* max */ ULONG_MAX, 0);
+
+static MYSQL_SYSVAR_ULONG(cloud_kafka_message_copy_max_bytes,
+                          rocksdb_cloud_kafka_message_copy_max_bytes,
+                          PLUGIN_VAR_OPCMDARG | PLUGIN_VAR_READONLY,
+                          "Maximum size for message to be copied to buffer. "
+                          "Messages larger than this will be passed by "
+                          "reference (zero-copy) at the expense of larger "
+                          "iovecs. "
+                          "See "
+                          "https://github.com/edenhill/librdkafka/blob/master/"
+                          "CONFIGURATION.md for details",
+                          nullptr, nullptr, 0L,
+                          /* min */ 0L, /* max */ ULONG_MAX, 0);
+
+static MYSQL_SYSVAR_ULONG(cloud_kafka_fetch_message_max_bytes,
+                          rocksdb_cloud_kafka_fetch_message_max_bytes,
+                          PLUGIN_VAR_OPCMDARG | PLUGIN_VAR_READONLY,
+                          "Initial maximum number of bytes per topic+partition "
+                          "to request when fetching messages from the broker. "
+                          "If the client encounters a message larger than this "
+                          "value it will gradually try to increase it until "
+                          "the entire message can be fetched. "
+                          "See "
+                          "https://github.com/edenhill/librdkafka/blob/master/"
+                          "CONFIGURATION.md for details",
+                          nullptr, nullptr, 0L,
+                          /* min */ 0L, /* max */ ULONG_MAX, 0);
+
+static MYSQL_SYSVAR_ULONG(cloud_kafka_receive_message_max_bytes,
+                          rocksdb_cloud_kafka_receive_message_max_bytes,
+                          PLUGIN_VAR_OPCMDARG | PLUGIN_VAR_READONLY,
+                          "Maximum Kafka protocol response message size. This "
+                          "serves as a safety precaution to avoid memory "
+                          "exhaustion in case of protocol hickups. This value "
+                          "must be at least fetch.max.bytes + 512 to allow for "
+                          "protocol overhead; the value is adjusted "
+                          "automatically unless the configuration property is "
+                          "explicitly set. "
+                          "See "
+                          "https://github.com/edenhill/librdkafka/blob/master/"
+                          "CONFIGURATION.md for details",
+                          nullptr, nullptr, 0L,
+                          /* min */ 0L, /* max */ ULONG_MAX, 0);
+
+static MYSQL_SYSVAR_ULONG(
+    cloud_request_timeout_ms, rocksdb_cloud_request_timeout_ms,
+    PLUGIN_VAR_OPCMDARG | PLUGIN_VAR_READONLY,
+    "Request timeout for requests from the cloud storage. A value of 0 "
+    "means the default timeout assigned by the underlying cloud storage.",
+    nullptr, nullptr, 0L,
+    /* min */ 0L, /* max */ ULONG_MAX, 0);
+
+static MYSQL_SYSVAR_STR(cloud_bucket_keyid, rocksdb_cloud_bucket_keyid,
+                        PLUGIN_VAR_OPCMDARG | PLUGIN_VAR_READONLY,
+                        "S3 bucket id", nullptr, nullptr, "");
+
+static MYSQL_SYSVAR_STR(cloud_bucket_secret, rocksdb_cloud_bucket_secret,
+                        PLUGIN_VAR_OPCMDARG | PLUGIN_VAR_READONLY,
+                        "S3 bucket secret", nullptr, nullptr, "");
+
+static MYSQL_SYSVAR_STR(cloud_bucket_region, rocksdb_cloud_bucket_region,
+                        PLUGIN_VAR_OPCMDARG | PLUGIN_VAR_READONLY,
+                        "S3 bucket region", nullptr, nullptr, "us-west-2");
+
+static MYSQL_SYSVAR_STR(cloud_bucket_suffix, rocksdb_cloud_bucket_suffix,
+                        PLUGIN_VAR_OPCMDARG | PLUGIN_VAR_READONLY,
+                        "S3 bucket suffix", nullptr, nullptr, "ha-rocksdb");
+
+static MYSQL_SYSVAR_BOOL(
+    cloud_keep_local_sst_files, rocksdb_cloud_keep_local_sst_files,
+    PLUGIN_VAR_OPCMDARG | PLUGIN_VAR_READONLY,
+    "If true,  then sst files are stored locally and uploaded to the cloud in "
+    "the background. On restart, all files from the cloud that are not present "
+    "locally are downloaded. "
+    "If false, then local sst files are created, uploaded to cloud "
+    "immediately, "
+    "and local file is deleted. All reads are satisfied by fetching "
+    "data from the cloud. Default:  false",
+    nullptr, nullptr, TRUE);
+
+static MYSQL_SYSVAR_BOOL(
+    cloud_keep_local_log_files, rocksdb_cloud_keep_local_log_files,
+    PLUGIN_VAR_OPCMDARG | PLUGIN_VAR_READONLY,
+    "If true, then .log and MANIFEST files are stored in a local file system. "
+    "They are not uploaded to any cloud logging system. "
+    "If false, then .log and MANIFEST files are not stored locally, and are "
+    "stored in a cloud-logging system like Kinesis. Default:  true",
+    nullptr, nullptr, TRUE);
+
+static MYSQL_SYSVAR_UINT(
+    cloud_log_type, rocksdb_cloud_log_type,
+    PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
+    "If keep_local_log_files is false, this specifies what service to use "
+    "for storage of write-ahead log. "
+    "kLogNone = 0x0     Not really a log env"
+    "kLogKinesis = 0x1  Kinesis"
+    "kLogKafka = 0x2    Kafka",
+    nullptr, nullptr, 1 /* default value */, 0 /* min value */,
+    2 /* max value */, 0);
+
+static MYSQL_SYSVAR_STR(cloud_kafka_metadata_broker_list,
+                        rocksdb_cloud_kafka_metadata_broker_list,
+                        PLUGIN_VAR_OPCMDARG | PLUGIN_VAR_READONLY,
+                        "Kafka (librdkafka) metadata.broker.list. Local Kafka "
+                        "server: 'localhost:9092'",
+                        nullptr, nullptr, "");
+
+static MYSQL_SYSVAR_INT(cloud_aws_log_level, rocksdb_cloud_aws_log_level,
+                        PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
+                        "Aws::SDKOptions.loggingOptions.logLevel. Log level "
+                        "for AWS SDK libs only. No change (default) = -1, Off "
+                        "= 0, Fatal = 1, Error = 2, Warn = 3, Info = 4, Debug "
+                        "= 5, Trace = 6."
+                        "See "
+                        "https://sdk.amazonaws.com/cpp/api/0.14.3/"
+                        "aws-cpp-sdk-core_2include_2aws_2core_2utils_2logging_"
+                        "2_log_level_8h_source.html",
+                        nullptr, nullptr, -1 /* default value */,
+                        -1 /* min value */, 6 /* max value */, 0);
+
+static MYSQL_SYSVAR_LONG(cloud_aws_request_timeout_ms,
+                         rocksdb_cloud_aws_request_timeout_ms,
+                         PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
+                         "Aws::Client::ClientConfiguration.requestTimeoutMs. "
+                         "-1 means default 600000",
+                         nullptr, nullptr, -1 /* default value */,
+                         -1 /* min value */, LONG_MAX /* max value */, 0);
+
+static MYSQL_SYSVAR_LONG(
+    cloud_aws_connect_timeout_ms, rocksdb_cloud_aws_connect_timeout_ms,
+    PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
+    "Aws::Client::ClientConfiguration.connectTimeoutMs. -1 means default 30000",
+    nullptr, nullptr, -1 /* default value */, -1 /* min value */,
+    LONG_MAX /* max value */, 0);
+
+static MYSQL_SYSVAR_STR(cloud_aws_endpoint_override,
+                        rocksdb_cloud_aws_endpoint_override,
+                        PLUGIN_VAR_OPCMDARG | PLUGIN_VAR_READONLY,
+                        "Aws::Client::ClientConfiguration.endpointOverride. "
+                        "Local S3/Minio server: '127.0.0.1:9000'",
+                        nullptr, nullptr, "");
+
+static MYSQL_SYSVAR_STR(cloud_aws_scheme, rocksdb_cloud_aws_scheme,
+                        PLUGIN_VAR_OPCMDARG | PLUGIN_VAR_READONLY,
+                        "Aws::Client::ClientConfiguration.scheme. Converted "
+                        "from string: 'http' or 'https'",
+                        nullptr, nullptr, "");
+
+static MYSQL_SYSVAR_INT(cloud_aws_verify_ssl, rocksdb_cloud_aws_verify_ssl,
+                        PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
+                        "Aws::Client::ClientConfiguration.verifySSL. No change "
+                        "(default) = -1, 0 - don't verify, 1 - do verify",
+                        nullptr, nullptr, -1 /* default value */,
+                        0 /* min value */, 1 /* max value */, 0);
+
+static MYSQL_SYSVAR_STR(cloud_aws_proxy_scheme, rocksdb_cloud_aws_proxy_scheme,
+                        PLUGIN_VAR_OPCMDARG | PLUGIN_VAR_READONLY,
+                        "Aws::Client::ClientConfiguration.proxyScheme. "
+                        "Converted from string: 'http' or 'https'",
+                        nullptr, nullptr, "");
+
+static MYSQL_SYSVAR_STR(cloud_aws_proxy_host, rocksdb_cloud_aws_proxy_host,
+                        PLUGIN_VAR_OPCMDARG | PLUGIN_VAR_READONLY,
+                        "Aws::Client::ClientConfiguration.proxyHost", nullptr,
+                        nullptr, "");
+
+static MYSQL_SYSVAR_INT(cloud_aws_proxy_port, rocksdb_cloud_aws_proxy_port,
+                        PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
+                        "Aws::Client::ClientConfiguration.proxyPort", nullptr,
+                        nullptr, -1 /* default value */, -1 /* min value */,
+                        INT_MAX /* max value */, 0);
+
+static MYSQL_SYSVAR_STR(cloud_aws_proxy_user_name,
+                        rocksdb_cloud_aws_proxy_user_name,
+                        PLUGIN_VAR_OPCMDARG | PLUGIN_VAR_READONLY,
+                        "Aws::Client::ClientConfiguration.proxyUserName",
+                        nullptr, nullptr, "");
+
+static MYSQL_SYSVAR_STR(cloud_aws_proxy_password,
+                        rocksdb_cloud_aws_proxy_password,
+                        PLUGIN_VAR_OPCMDARG | PLUGIN_VAR_READONLY,
+                        "Aws::Client::ClientConfiguration.proxyPassword",
+                        nullptr, nullptr, "");
+
 std::atomic<uint64_t> rocksdb_row_lock_deadlocks(0);
 std::atomic<uint64_t> rocksdb_row_lock_wait_timeouts(0);
 std::atomic<uint64_t> rocksdb_snapshot_conflict_errors(0);
@@ -781,20 +1027,6 @@ static MYSQL_SYSVAR_BOOL(
     PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
     "DBOptions::create_if_missing for RocksDB", nullptr, nullptr,
     rocksdb_db_options->create_if_missing);
-
-static void concurrent_prepare_update(THD *thd, st_mysql_sys_var *var,
-                                      void *var_ptr, const void *save) {
-  push_warning(thd, Sql_condition::SL_WARNING, HA_ERR_WRONG_COMMAND,
-               "Using rocksdb_concurrent_prepare is deprecated and the "
-               "parameter may be removed in future releases.");
-}
-
-static MYSQL_SYSVAR_BOOL(
-    concurrent_prepare,
-    *reinterpret_cast<my_bool *>(&rocksdb_db_options->two_write_queues),
-    PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
-    "DEPRECATED, use rocksdb_two_write_queries instead.", nullptr,
-    concurrent_prepare_update, rocksdb_db_options->two_write_queues);
 
 static MYSQL_SYSVAR_BOOL(
     two_write_queues,
@@ -1611,7 +1843,6 @@ static struct st_mysql_sys_var *rocksdb_system_variables[] = {
     MYSQL_SYSVAR(skip_bloom_filter_on_read),
 
     MYSQL_SYSVAR(create_if_missing),
-    MYSQL_SYSVAR(concurrent_prepare),
     MYSQL_SYSVAR(two_write_queues),
     MYSQL_SYSVAR(manual_wal_flush),
     MYSQL_SYSVAR(write_policy),
@@ -1731,6 +1962,35 @@ static struct st_mysql_sys_var *rocksdb_system_variables[] = {
     MYSQL_SYSVAR(table_stats_sampling_pct),
 
     MYSQL_SYSVAR(large_prefix),
+
+    MYSQL_SYSVAR(cloud_bucket_keyid),
+    MYSQL_SYSVAR(cloud_bucket_secret),
+    MYSQL_SYSVAR(cloud_bucket_region),
+    MYSQL_SYSVAR(cloud_bucket_suffix),
+    MYSQL_SYSVAR(cloud_persistent_cache_size_gb),
+    MYSQL_SYSVAR(cloud_keep_local_sst_files),
+    MYSQL_SYSVAR(cloud_keep_local_log_files),
+    MYSQL_SYSVAR(cloud_log_type),
+    MYSQL_SYSVAR(cloud_kafka_metadata_broker_list),
+    MYSQL_SYSVAR(cloud_request_timeout_ms),
+    MYSQL_SYSVAR(cloud_kafka_message_max_bytes),
+    MYSQL_SYSVAR(cloud_kafka_message_copy_max_bytes),
+    MYSQL_SYSVAR(cloud_kafka_fetch_message_max_bytes),
+    MYSQL_SYSVAR(cloud_kafka_receive_message_max_bytes),
+    MYSQL_SYSVAR(cloud_clone_datadir),
+
+    MYSQL_SYSVAR(cloud_aws_log_level),
+    MYSQL_SYSVAR(cloud_aws_request_timeout_ms),
+    MYSQL_SYSVAR(cloud_aws_connect_timeout_ms),
+    MYSQL_SYSVAR(cloud_aws_endpoint_override),
+    MYSQL_SYSVAR(cloud_aws_scheme),
+    MYSQL_SYSVAR(cloud_aws_verify_ssl),
+    MYSQL_SYSVAR(cloud_aws_proxy_scheme),
+    MYSQL_SYSVAR(cloud_aws_proxy_host),
+    MYSQL_SYSVAR(cloud_aws_proxy_port),
+    MYSQL_SYSVAR(cloud_aws_proxy_user_name),
+    MYSQL_SYSVAR(cloud_aws_proxy_password),
+
     MYSQL_SYSVAR(allow_to_start_after_corruption),
     MYSQL_SYSVAR(error_on_suboptimal_collation),
     MYSQL_SYSVAR(no_create_column_family),
@@ -3935,16 +4195,16 @@ rocksdb_rollback_to_savepoint_can_release_mdl(handlerton *const hton,
 }
 
 static rocksdb::Status check_rocksdb_options_compatibility(
-  const char *const dbpath, const rocksdb::Options& main_opts,
-  const std::vector<rocksdb::ColumnFamilyDescriptor>& cf_descr)
-{
+    const char *const dbpath, const rocksdb::Options &main_opts,
+    const std::vector<rocksdb::ColumnFamilyDescriptor> &cf_descr,
+    rocksdb::CloudEnv *cenv) {
   DBUG_ASSERT(rocksdb_datadir != nullptr);
 
   rocksdb::DBOptions loaded_db_opt;
   std::vector<rocksdb::ColumnFamilyDescriptor> loaded_cf_descs;
   rocksdb::Status status =
-      LoadLatestOptions(dbpath, rocksdb::Env::Default(), &loaded_db_opt,
-                        &loaded_cf_descs, rocksdb_ignore_unknown_options);
+      LoadLatestOptions(dbpath, cenv, &loaded_db_opt, &loaded_cf_descs,
+                        rocksdb_ignore_unknown_options);
 
   // If we're starting from scratch and there are no options saved yet then this
   // is a valid case. Therefore we can't compare the current set of options to
@@ -3982,8 +4242,7 @@ static rocksdb::Status check_rocksdb_options_compatibility(
 
   // This is the essence of the function - determine if it's safe to open the
   // database or not.
-  status = CheckOptionsCompatibility(dbpath, rocksdb::Env::Default(), main_opts,
-                                     loaded_cf_descs,
+  status = CheckOptionsCompatibility(dbpath, cenv, main_opts, loaded_cf_descs,
                                      rocksdb_ignore_unknown_options);
 
   return status;
@@ -4016,6 +4275,18 @@ static int rocksdb_init_func(void *const p) {
 
   // Validate the assumption about the size of ROCKSDB_SIZEOF_HIDDEN_PK_COLUMN.
   static_assert(sizeof(longlong) == 8, "Assuming that longlong is 8 bytes.");
+
+  sql_print_information("Starting MyRock Cloud init...");
+
+  static const char *rocksdb_cloud_original_datadir = nullptr;
+  if (rocksdb_cloud_clone_datadir) {
+    rocksdb_cloud_original_datadir = rocksdb_datadir;
+    rocksdb_datadir = rocksdb_cloud_clone_datadir;
+    sql_print_information("Using clone %s of %s", rocksdb_datadir,
+                          rocksdb_cloud_original_datadir);
+  } else {
+    rocksdb_cloud_original_datadir = rocksdb_datadir;
+  }
 
   // Lock the handlertons initialized status flag for writing
   Rdb_hton_init_state::Scoped_lock state_lock(*rdb_get_hton_init_state(), true);
@@ -4175,17 +4446,191 @@ static int rocksdb_init_func(void *const p) {
     DBUG_RETURN(HA_EXIT_FAILURE);
   }
 
+  rocksdb::Status status;
+
+  // cloud environment config options here, see for details:
+  // https://github.com/rockset/rocksdb-cloud-private/blob/master/include/rocksdb/cloud/cloud_env_options.h
+  static rocksdb::CloudEnvOptions cloud_env_options;
+  cloud_env_options.keep_local_sst_files = rocksdb_cloud_keep_local_sst_files;
+  cloud_env_options.keep_local_log_files = rocksdb_cloud_keep_local_log_files;
+
+  // If keep_local_log_files is false, this specifies what service to use
+  // for storage of write-ahead log.
+  //    kLogNone = 0x0     Not really a log env
+  //    kLogKinesis = 0x1  Kinesis
+  //    kLogKafka = 0x2    Kafka
+  cloud_env_options.log_type = (rocksdb::LogType)rocksdb_cloud_log_type;
+
+  // Only used if keep_local_log_files is true and log_type is kKafka.
+  // [MS] Due to  API change
+  // https://github.com/rockset/rocksdb-cloud-private/commit/8d462e3ae1ea1ed1b888b44f25528597be188a2f
+  //  cloud_env_options.kafka_log_options.broker_list =
+  //  rocksdb_cloud_kafka_metadata_broker_list;
+  cloud_env_options.kafka_log_options
+      .client_config_params["metadata.broker.list"] =
+      rocksdb_cloud_kafka_metadata_broker_list;
+
+  // [MS] Fix for https://github.com/rockset/rocksdb-cloud-private/issues/17
+  if (rocksdb_cloud_kafka_message_max_bytes > 0)
+    cloud_env_options.kafka_log_options
+        .client_config_params["message.max.bytes"] =
+        std::to_string(rocksdb_cloud_kafka_message_max_bytes);
+
+  if (rocksdb_cloud_kafka_fetch_message_max_bytes > 0)
+    cloud_env_options.kafka_log_options
+        .client_config_params["fetch.message.max.bytes"] =
+        std::to_string(rocksdb_cloud_kafka_fetch_message_max_bytes);
+
+  if (rocksdb_cloud_kafka_receive_message_max_bytes > 0)
+    cloud_env_options.kafka_log_options
+        .client_config_params["receive.message.max.bytes"] =
+        std::to_string(rocksdb_cloud_kafka_receive_message_max_bytes);
+
+  if (rocksdb_cloud_kafka_message_copy_max_bytes > 0)
+    cloud_env_options.kafka_log_options
+        .client_config_params["message.copy.max.bytes"] =
+        std::to_string(rocksdb_cloud_kafka_message_copy_max_bytes);
+
+  // If false, it will not attempt to create cloud bucket if it doesn't exist.
+  // Default: true
+  //  cloud_env_options.create_bucket_if_missing = ;
+
+  // Request timeout for requests from the cloud storage. A value of 0
+  // means the default timeout assigned by the underlying cloud storage.
+  cloud_env_options.request_timeout_ms = rocksdb_cloud_request_timeout_ms;
+
+  cloud_env_options.credentials.access_key_id.assign(
+      rocksdb_cloud_bucket_keyid);
+  cloud_env_options.credentials.secret_key.assign(rocksdb_cloud_bucket_secret);
+
+  // Store a reference to a cloud env. A new cloud env object should be
+  // associated with every new cloud-db.
+  static std::unique_ptr<rocksdb::CloudEnv> cloud_env;
+
+  static rocksdb::CloudEnv *cenv;
+
+  // Need absolute path for DB otherwise will get missing CURRENT and 403 errors
+  static std::string kDBPath;
+  static std::string original_kDBPath;
+  {
+    char s[PATH_MAX];
+    if (!realpath(rocksdb_datadir, s)) {
+      rdb_log_status_error(status, "Can't resolve full path for RocksDB");
+      DBUG_RETURN(HA_EXIT_FAILURE);
+    }
+    kDBPath = s;
+
+    if (!realpath(rocksdb_cloud_original_datadir, s)) {
+      rdb_log_status_error(status, "Can't resolve full path for RocksDB");
+      DBUG_RETURN(HA_EXIT_FAILURE);
+    }
+    original_kDBPath = s;
+  }
+
+  sql_print_information("RocksDB dir: %s", kDBPath.c_str());
+  sql_print_information("RocksDB original dir: %s", original_kDBPath.c_str());
+  sql_print_information("rocksdb::CloudEnv::NewAwsEnv");
+  sql_print_information(
+      "  [TODO - my commit #1 is needed] librocksdb is MODIFIED!");
+
+  if (cloud_env_options.keep_local_sst_files)
+    sql_print_information("  SSTs are local and Cloud");
+  else
+    sql_print_information("  SSTs are Cloud only");
+
+  if (cloud_env_options.keep_local_log_files)
+    sql_print_information("  .log and MANIFEST are local only");
+  else {
+    sql_print_information(
+        "  .log and MANIFEST are Cloud only. Using service %d",
+        cloud_env_options.log_type);
+    sql_print_information("    1 - Kinesis, 2 - Kafka");
+    if (cloud_env_options.log_type == rocksdb::kLogKafka)
+      sql_print_information("  Using Kafka broker(s) at %s",
+                            cloud_env_options.kafka_log_options
+                                .client_config_params["metadata.broker.list"]
+                                .c_str());
+  }
+
+  sql_print_information("  request_timeout_ms = %lu",
+                        cloud_env_options.request_timeout_ms);
+
+  /*
+    cloud_env_options.aws_options.endpointOverride.assign("127.0.0.1:9000");
+    cloud_env_options.aws_options.scheme.assign("http");
+    cloud_env_options.aws_options.verifySSL = 0;
+  */
+  cloud_env_options.aws_options.logLevel = rocksdb_cloud_aws_log_level;
+  cloud_env_options.aws_options.connectTimeoutMs =
+      rocksdb_cloud_aws_connect_timeout_ms;
+  cloud_env_options.aws_options.requestTimeoutMs =
+      rocksdb_cloud_aws_request_timeout_ms;
+  cloud_env_options.aws_options.endpointOverride.assign(
+      rocksdb_cloud_aws_endpoint_override);
+  cloud_env_options.aws_options.scheme.assign(rocksdb_cloud_aws_scheme);
+  cloud_env_options.aws_options.verifySSL = rocksdb_cloud_aws_verify_ssl;
+  cloud_env_options.aws_options.proxyScheme.assign(
+      rocksdb_cloud_aws_proxy_scheme);
+  cloud_env_options.aws_options.proxyHost.assign(rocksdb_cloud_aws_proxy_host);
+  cloud_env_options.aws_options.proxyPort = rocksdb_cloud_aws_proxy_port;
+  cloud_env_options.aws_options.proxyUserName.assign(
+      rocksdb_cloud_aws_proxy_user_name);
+  cloud_env_options.aws_options.proxyPassword.assign(
+      rocksdb_cloud_aws_proxy_password);
+
+  // Now, create a cloud env with the above settings
+  status = rocksdb::CloudEnv::NewAwsEnv(
+      rocksdb::Env::Default(), rocksdb_cloud_bucket_suffix,
+      //    kDBPath,
+      original_kDBPath,  // adding create clone support
+      rocksdb_cloud_bucket_region, rocksdb_cloud_bucket_suffix, kDBPath,
+      rocksdb_cloud_bucket_region, cloud_env_options, myrocks_logger, &cenv);
+  if (status.ok()) {
+    sql_print_information("rocksdb::CloudEnv::NewAwsEnv is ok");
+  } else {
+    rdb_log_status_error(status, "rocksdb::CloudEnv::NewAwsEnv failed");
+    DBUG_RETURN(HA_EXIT_FAILURE);
+  }
+
+  // Extra init needed
+  cloud_env.reset(cenv);
+
+  // Create options and use the AWS env that we created earlier
+  // There are rocksdb_db_options and main_opts, move the main_opts extra init
+  // below to after main_opts init
+  //  main_opts.env = cloud_env.get();
+  //  main_opts.create_if_missing = true;
+
+  // rocksdb_db_options->env is being used for NewSstFileManager(),
+  // ListColumnFamilies() - needed Cloud env instead of defaults to avoid
+  // conflicts
+  //  sql_print_information("Fixme: needed rocksdb_db_options->env = cenv");
+  rocksdb_db_options->env = cenv;
+
+  //  static Status DBCloud::PreloadCloudManifest(CloudEnv* cenv, const
+  //  std::string& dbname);
+  status = rocksdb::DBCloud::PreloadCloudManifest(cenv, kDBPath);
+  if (status.ok()) {
+    sql_print_information("rocksdb::DBCloud::PreloadCloudManifest() is ok");
+  } else {
+    rdb_log_status_error(status,
+                         "rocksdb::DBCloud::PreloadCloudManifest() failed");
+    DBUG_RETURN(HA_EXIT_FAILURE);
+  }
+
   // sst_file_manager will move deleted rocksdb sst files to trash_dir
   // to be deleted in a background thread.
-  std::string trash_dir = std::string(rocksdb_datadir) + "/trash";
+  std::string trash_dir = std::string(kDBPath) + "/trash";
+  //  sql_print_information("Fixme: NewSstFileManager() if use cenv - got
+  //  GetChildren /mnt/ssd2/mariadb-10.4_2018-05-31/data/#rocksdb/trash error on
+  //  local dir");
   rocksdb_db_options->sst_file_manager.reset(NewSstFileManager(
       rocksdb_db_options->env, myrocks_logger, trash_dir,
       rocksdb_sst_mgr_rate_bytes_per_sec, true /* delete_existing_trash */));
 
   std::vector<std::string> cf_names;
-  rocksdb::Status status;
-  status = rocksdb::DB::ListColumnFamilies(*rocksdb_db_options, rocksdb_datadir,
-                                           &cf_names);
+  status = rocksdb::DBCloud::ListColumnFamilies(*rocksdb_db_options, kDBPath,
+                                                &cf_names);
   if (!status.ok()) {
     /*
       When we start on an empty datadir, ListColumnFamilies returns IOError,
@@ -4196,6 +4641,8 @@ static int rocksdb_init_func(void *const p) {
       sql_print_information("RocksDB: Got ENOENT when listing column families");
       sql_print_information(
           "RocksDB:   assuming that we're creating a new database");
+      sql_print_information("ListColumnFamilies() extra info: %s",
+                            status.getState());
     } else {
       rdb_log_status_error(status, "Error listing column families");
       DBUG_RETURN(HA_EXIT_FAILURE);
@@ -4280,7 +4727,8 @@ static int rocksdb_init_func(void *const p) {
   if (cf_names.size() == 0)
     cf_names.push_back(DEFAULT_CF_NAME);
 
-  std::vector<int> compaction_enabled_cf_indices;
+  std::vector<long unsigned int>
+      compaction_enabled_cf_indices;  // needed for TransactionDB::WrapDB
   sql_print_information("RocksDB: Column Families at start:");
   for (size_t i = 0; i < cf_names.size(); ++i) {
     rocksdb::ColumnFamilyOptions opts;
@@ -4305,31 +4753,84 @@ static int rocksdb_init_func(void *const p) {
   rocksdb::Options main_opts(*rocksdb_db_options,
                              cf_options_map->get_defaults());
 
+  main_opts.env = cloud_env.get();
+  main_opts.create_if_missing = true;
+  main_opts.allow_2pc = true;  // issue #10 fix?
+
   rocksdb::TransactionDBOptions tx_db_options;
   tx_db_options.transaction_lock_timeout = 2000;  // 2 seconds
   tx_db_options.custom_mutex_factory = std::make_shared<Rdb_mutex_factory>();
   tx_db_options.write_policy =
       static_cast<rocksdb::TxnDBWritePolicy>(rocksdb_write_policy);
 
-  status =
-      check_rocksdb_options_compatibility(rocksdb_datadir, main_opts, cf_descr);
+  // Using workaround: drop check_rocksdb_options_compatibility() and
+  // rocksdb::LoadLatestOptions() that causes assert(cloud_manifest_)
+  //  sql_print_information("Workaround: Dropped
+  //  check_rocksdb_options_compatibility() and rocksdb::LoadLatestOptions()
+  //  that causes assert(cloud_manifest_). Not reading from OPTIONS.");
 
-  // We won't start if we'll determine that there's a chance of data corruption
-  // because of incompatible options.
+  status =
+      // original code equivalent:
+      //      check_rocksdb_options_compatibility(rocksdb_datadir, main_opts,
+      //      cf_descr, (rocksdb::CloudEnv*) rocksdb::Env::Default());
+      // suggested code:
+      // ok for 1st run but for next  got assert(cloud_manifest_) @
+      // cloud_env.cc:78 LoadLocalCloudManifest() fills cloud_manifest_ but must
+      // be called once - done in DBCloudImpl::Open()
+      check_rocksdb_options_compatibility(kDBPath.c_str(), main_opts, cf_descr,
+                                          cenv);
   if (!status.ok()) {
     rdb_log_status_error(
         status, "Compatibility check against existing database options failed");
     DBUG_RETURN(HA_EXIT_FAILURE);
   }
 
-  status = rocksdb::TransactionDB::Open(
-      main_opts, tx_db_options, rocksdb_datadir, cf_descr, &cf_handles, &rdb);
-
   if (!status.ok()) {
     rdb_log_status_error(status, "Error opening instance");
     DBUG_RETURN(HA_EXIT_FAILURE);
   }
+
+  static std::string persistent_cache = kDBPath;
+
+  sql_print_information("rocksdb::DBCloud::Open");
+  if (!rocksdb_cloud_persistent_cache_size_gb)
+    sql_print_information("  no persistent cache");
+  else
+    sql_print_information("  persistent cache %ld GB at %s",
+                          rocksdb_cloud_persistent_cache_size_gb,
+                          persistent_cache.c_str());
+
+  // open a cloud DB instance
+  static rocksdb::DBCloud *db;
+  sql_print_information("Enter rocksdb::DBCloud::Open");
+  status = rocksdb::DBCloud::Open(
+      main_opts, kDBPath, cf_descr,
+      persistent_cache,                        // persistent_cache path
+      rocksdb_cloud_persistent_cache_size_gb,  // persistent_cache size
+      &cf_handles, &db);
+  sql_print_information("Leave rocksdb::DBCloud::Open");
+  if (!status.ok()) {
+    rdb_log_status_error(status, "DBCloud::Open failed");
+    DBUG_RETURN(HA_EXIT_FAILURE);
+  } else
+    sql_print_information("DBCloud::Open is ok");
+
   cf_manager.init(std::move(cf_options_map), &cf_handles);
+
+  // wrap it using a TransactionDB. See code in pessimistic_transaction_db.cc
+  sql_print_information(
+      "[?] Should we do cf_manager.init before or after TransactionDB::WrapDB");
+
+  status = rocksdb::TransactionDB::WrapDB((rocksdb::DB *)db, tx_db_options,
+                                          compaction_enabled_cf_indices,
+                                          cf_handles, &rdb);
+  if (!status.ok()) {
+    rdb_log_status_error(status, "TransactionDB::WrapDB failed");
+    DBUG_RETURN(HA_EXIT_FAILURE);
+  } else
+    sql_print_information("TransactionDB::WrapDB is ok");
+
+  sql_print_information("RocksDB Cloud init done");
 
   if (dict_manager.init(rdb, &cf_manager)) {
     // NO_LINT_DEBUG

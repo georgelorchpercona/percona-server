@@ -25,6 +25,7 @@
 /* RocksDB includes */
 #include "rocksdb/table.h"
 #include "rocksdb/utilities/transaction_db.h"
+#include "rocksdb/cloud/db_cloud.h"
 
 namespace myrocks {
 
