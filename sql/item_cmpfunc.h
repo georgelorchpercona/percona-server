@@ -28,8 +28,7 @@
 #include <string.h>
 #include <sys/types.h>
 
-//#include "extra/regex/my_regex.h"  // my_regex_t
-
+#include "extra/regex/my_regex.h"  // my_regex_t
 #include "m_ctype.h"
 #include "my_alloc.h"
 #include "my_compiler.h"
