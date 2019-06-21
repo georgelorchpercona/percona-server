@@ -18,6 +18,7 @@
 #include "./rdb_index_merge.h"
 
 /* MySQL header files */
+#include "my_systime.h"  // my_sleep
 #include "mysql/plugin.h"
 #include "mysql/psi/mysql_file.h"
 

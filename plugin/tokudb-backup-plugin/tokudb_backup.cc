@@ -8,6 +8,7 @@
 #define MYSQL_SERVER 1
 #include "mysql_version.h"
 
+#include "extra/regex/my_regex.h"
 #include "my_dbug.h"
 #include "mysql/plugin.h"
 #include "sql/auth/auth_acls.h"  // SUPER_ACL

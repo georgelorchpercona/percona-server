@@ -11218,13 +11218,13 @@ void ha_rocksdb::get_auto_increment(ulonglong off, ulonglong inc,
 /* Debugger help function */
 static char dbug_item_print_buf[512];
 
-const char *dbug_print_item(Item *const item) {
+const char *dbug_print_item(const THD *thd, Item *const item) {
   char *const buf = dbug_item_print_buf;
   String str(buf, sizeof(dbug_item_print_buf), &my_charset_bin);
   str.length(0);
   if (!item)
     return "(Item*)nullptr";
-  item->print(&str, QT_ORDINARY);
+  item->print(thd, &str, QT_ORDINARY);
   if (str.c_ptr() == buf)
     return buf;
   else
