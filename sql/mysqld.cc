@@ -3631,8 +3631,13 @@ void my_message_sql(uint error, const char *str, myf MyFlags) {
       will not result in writing to that log to prevent abuse.
       We're asserting after rather than before printing to make
       the culprit easier to track down.
+
+      Percona Server : The range 50000-50199 was reserved by Oracle,
+      specifically for Facebook MyRocks client error messages.
     */
-    DBUG_ASSERT(error < ER_SERVER_RANGE_START);
+    DBUG_ASSERT(error < ER_SERVER_RANGE_START ||
+               (error >= ER_RESERVED_RANGE_START &&
+                error <= ER_RESERVED_RANGE_END));
   }
 
   /* When simulating OOM, skip writing to error log to avoid mtr errors */

@@ -230,5 +230,7 @@ static const int iso8601_size = 33;
   are intended for the client
 */
 #define ER_SERVER_RANGE_START 10000
+#define ER_RESERVED_RANGE_START 48000
+#define ER_RESERVED_RANGE_END 51999
 
 #endif
