@@ -3007,6 +3007,7 @@ static const char *optimizer_switch_names[]=
   "materialization", "semijoin", "loosescan", "firstmatch", "duplicateweedout",
   "subquery_materialization_cost_based",
   "use_index_extensions", "condition_fanout_filter", "derived_merge",
+  "reconsider_index_for_order",
   "default", NullS
 };
 static Sys_var_flagset Sys_optimizer_switch(

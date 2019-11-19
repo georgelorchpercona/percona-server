@@ -301,7 +301,8 @@
 #define OPTIMIZER_SWITCH_USE_INDEX_EXTENSIONS      (1ULL << 16)
 #define OPTIMIZER_SWITCH_COND_FANOUT_FILTER        (1ULL << 17)
 #define OPTIMIZER_SWITCH_DERIVED_MERGE             (1ULL << 18)
-#define OPTIMIZER_SWITCH_LAST                      (1ULL << 19)
+#define OPTIMIZER_SWITCH_RECONSIDER_INDEX_FOR_ORDER (1ULL << 19)
+#define OPTIMIZER_SWITCH_LAST                      (1ULL << 20)
 
 #define OPTIMIZER_SWITCH_DEFAULT (OPTIMIZER_SWITCH_INDEX_MERGE | \
                                   OPTIMIZER_SWITCH_INDEX_MERGE_UNION | \
@@ -320,7 +321,8 @@
                                   OPTIMIZER_SWITCH_SUBQ_MAT_COST_BASED | \
                                   OPTIMIZER_SWITCH_USE_INDEX_EXTENSIONS | \
                                   OPTIMIZER_SWITCH_COND_FANOUT_FILTER | \
-                                  OPTIMIZER_SWITCH_DERIVED_MERGE)
+                                  OPTIMIZER_SWITCH_DERIVED_MERGE | \
+                                  OPTIMIZER_SWITCH_RECONSIDER_INDEX_FOR_ORDER)
 
 enum SHOW_COMP_OPTION { SHOW_OPTION_YES, SHOW_OPTION_NO, SHOW_OPTION_DISABLED};
 
