@@ -28,6 +28,114 @@ IF (NOT CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
 ENDIF ()
 
 
+IF(HAVE_EXTERNAL_ROCKSDB)
+  MESSAGE(STATUS "MyRocks: Using external RocksDB")
+  SET(ROCKSDB_ROOT ${ROCKSDB_SRC_PATH})
+ELSE()
+  MESSAGE(STATUS "MyRocks: Using local RocksDB")
+
+  IF (NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/rocksdb/Makefile")
+    MESSAGE(SEND_ERROR "Missing Makefile in rocksdb directory. Try \"git submodule update\".")
+  ENDIF()
+
+  SET(ROCKSDB_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/rocksdb)
+
+  # get a list of rocksdb library source files
+  # run with env -i to avoid passing variables
+  EXECUTE_PROCESS(
+    COMMAND env -i ${CMAKE_CURRENT_SOURCE_DIR}/get_rocksdb_files.sh
+    OUTPUT_VARIABLE SCRIPT_OUTPUT
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  )
+  # split the list into lines
+  STRING(REGEX MATCHALL "[^\n]+" ROCKSDB_LIB_SOURCES ${SCRIPT_OUTPUT})
+
+  LIST(APPEND PLUGINS ${ROCKSDB_PLUGINS})
+  FOREACH(PLUGIN IN LISTS PLUGINS)
+    SET(PLUGIN_ROOT "${ROCKSDB_ROOT}/plugin/${PLUGIN}/")
+    MESSAGE(STATUS "MyRocks: Building RocksDB plugin: ${PLUGIN}")
+    FILE(GLOB PLUGINMKFILE "${PLUGIN_ROOT}${PLUGIN}*.mk")
+    IF (NOT EXISTS ${PLUGINMKFILE})
+      MESSAGE(SEND_ERROR "Missing RocksDB plugin makefile in ${PLUGIN_ROOT}")
+    ELSE()
+      FILE(READ ${PLUGINMKFILE} PLUGINMK)
+      STRING(REGEX MATCH "SOURCES[ ]*=[ ]*([^\n]*)" FOO ${PLUGINMK})
+      SET(MK_SOURCES ${CMAKE_MATCH_1})
+      SEPARATE_ARGUMENTS(MK_SOURCES)
+      FOREACH(MK_FILE IN LISTS MK_SOURCES)
+        LIST(APPEND PLUGIN_SOURCES "${PLUGIN_ROOT}${MK_FILE}")
+      ENDFOREACH()
+      STRING(REGEX MATCH "LDFLAGS[ ]*=[ ]*([^\n]*)" FOO ${PLUGINMK})
+      LIST(APPEND PLUGIN_LD ${CMAKE_MATCH_1} )
+    ENDIF()
+  ENDFOREACH()
+
+  # Statically include all RocksDB source
+  SET(ROCKSDB_SOURCES
+    ${ROCKSDB_LIB_SOURCES}
+    ${PLUGIN_SOURCES}
+  )
+ENDIF()
+
+# This is a strong requirement coming from RocksDB. No conditional checks here.
+add_definitions(-DROCKSDB_PLATFORM_POSIX -DROCKSDB_LIB_IO_POSIX -DZLIB -DLZ4 -DZSTD)
+
+IF (ROCKSDB_CUSTOM_NAMESPACE)
+  ADD_DEFINITIONS(-DROCKSDB_NAMESPACE=${ROCKSDB_CUSTOM_NAMESPACE})
+  ADD_DEFINITIONS(-DROCKSDB_CUSTOM_NAMESPACE=${ROCKSDB_CUSTOM_NAMESPACE})
+ENDIF()
+
+include(compiler_features)
+
+IF (NOT HAVE_THREAD_LOCAL)
+  MESSAGE(FATAL_ERROR "No '__thread' support found. Not building MyRocks")
+ENDIF()
+
+IF (HAVE_SSE42 AND HAVE_PCLMUL)
+  add_compile_flags(${ROCKSDB_ROOT}/util/crc32c.cc COMPILE_FLAGS "-msse4.2 -mpclmul")
+  MESSAGE(STATUS "MyRocks: SSE42 support found")
+ELSE()
+  IF (ALLOW_NO_SSE42)
+    MESSAGE(WARNING "No SSE42 support found and ALLOW_NO_SSE42 specified, building MyRocks but without SSE42/FastCRC32 support")
+  ELSE()
+    MESSAGE(FATAL_ERROR "No SSE42 support found. Not building MyRocks")
+  ENDIF()
+ENDIF()
+
+IF (HAVE_AVX2)
+  add_compile_flags(${ROCKSDB_ROOT}/table/block_based/filter_policy.cc COMPILE_FLAGS "-mavx2")
+ENDIF()
+
+IF (HAVE_URING AND ROCKSDB_USE_IO_URING)
+  SET(rocksdb_static_libs ${rocksdb_static_libs} ${URING_LIBRARY})
+ENDIF()
+
+IF (HAVE_MEMKIND AND ROCKSDB_USE_MEMKIND)
+  SET(rocksdb_static_libs ${rocksdb_static_libs} ${MEMKIND_LIBRARY})
+ENDIF()
+
+IF (HAVE_ALIGNED_NEW AND NOT ROCKSDB_DISABLE_ALIGNED_NEW)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -faligned-new")
+ENDIF()
+
+IF (CMAKE_COMPILER_IS_GNUCXX)
+  add_compile_options(-fno-builtin-memcmp)
+ENDIF()
+
+IF (CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "x86_64")
+  add_compile_options(-march=native)
+ENDIF()
+
+IF(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  add_definitions(-DOS_LINUX)
+ENDIF()
+
+ROCKSDB_SET_DEFINTIONS()
+get_directory_property(COMPILE_DEFINITIONS COMPILE_DEFINITIONS)
+list(SORT COMPILE_DEFINITIONS)
+message(STATUS "MyRocks compile definitions: ${COMPILE_DEFINITIONS}")
+
+
 # Suppress warnings for all compilers
 append_cflags_if_supported(-Wno-unused-parameter -Wno-suggest-override)
 # "cmake/maintainer.cmake" sets "-Wcast-qual -Wundef" which cause warnings with RocksDB
@@ -215,7 +323,7 @@ IF(HAVE_EXTERNAL_ROCKSDB)
   SET(rocksdb_static_libs "${ROCKSDB_LIB_PATH}/${ROCKSDB_LIB_NAME}")
 ENDIF()
 
-SET(rocksdb_static_libs ${rocksdb_static_libs} ${ZLIB_LIBRARY} ${ZSTD_LIBRARY} ${LZ4_LIBRARY} "-lrt" "-ldl")
+SET(rocksdb_static_libs ${rocksdb_static_libs} ${ZLIB_LIBRARY} ${ZSTD_LIBRARY} ${LZ4_LIBRARY} "-lrt" "-ldl" ${PLUGIN_LD})
 
 MYSQL_ADD_PLUGIN(rocksdb ${ROCKSDB_SOURCES} STORAGE_ENGINE DEFAULT MODULE_ONLY
   LINK_LIBRARIES ${rocksdb_static_libs}
